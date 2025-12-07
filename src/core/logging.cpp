@@ -45,8 +45,4 @@ void logError(const char* format, ...) {
     va_end(args);
     Serial.printf("[%lu] [ERROR] %s\n", millis(), buffer);
 #endif
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> origin/main

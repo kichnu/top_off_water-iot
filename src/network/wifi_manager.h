@@ -9,8 +9,4 @@ bool isWiFiConnected();
 String getWiFiStatus();
 IPAddress getLocalIP();
 
-<<<<<<< HEAD
 #endif
-=======
-#endif
->>>>>>> origin/main

@@ -1,8 +1,3 @@
-<<<<<<< HEAD
-=======
-
-
->>>>>>> origin/main
 #include "vps_logger.h"
 #include "../config/config.h"
 #include "../hardware/water_sensors.h"
@@ -14,30 +9,13 @@
 #include <ArduinoJson.h>
 #include "../algorithm/algorithm_config.h"
 #include "../algorithm/water_algorithm.h"
-<<<<<<< HEAD
 #include "../config/credentials_manager.h"
-=======
-
-#if MODE_PRODUCTION
-    #include "../config/credentials_manager.h"
-#endif
->>>>>>> origin/main
 
 extern WaterAlgorithm waterAlgorithm;
 
 void initVPSLogger() {
-<<<<<<< HEAD
     LOG_INFO("VPS Logger initialized - endpoint: %s", getVPSURL());
     LOG_INFO("Using %s credentials", areCredentialsLoaded() ? "FRAM" : "fallback");
-=======
-#if MODE_PRODUCTION
-    LOG_INFO("VPS Logger initialized - endpoint: %s", getVPSURL());  // 🆕 Dynamic URL
-    LOG_INFO("Using %s credentials", areCredentialsLoaded() ? "FRAM" : "fallback");
-#else
-    LOG_INFO("VPS Logger initialized - endpoint: %s", VPS_URL);
-    LOG_INFO("Using hardcoded credentials (programming mode)");
-#endif
->>>>>>> origin/main
 }
 
 bool logEventToVPS(const String& eventType, uint16_t volumeML, uint32_t unixTime) {
@@ -66,10 +44,6 @@ bool logEventToVPS(const String& eventType, uint16_t volumeML, uint32_t unixTime
     
     HTTPClient http;
     
-<<<<<<< HEAD
-=======
-#if MODE_PRODUCTION
->>>>>>> origin/main
     const char* vpsUrl = getVPSURL();
     http.begin(vpsUrl);
     
@@ -80,38 +54,18 @@ bool logEventToVPS(const String& eventType, uint16_t volumeML, uint32_t unixTime
     payload["device_id"] = getDeviceID();
     
     LOG_INFO("Using dynamic VPS URL: %s (timeout: %dms)", vpsUrl, timeoutMs);
-<<<<<<< HEAD
-=======
-#else
-    http.begin(VPS_URL);
-    
-    String authHeader = "Bearer " + String(VPS_AUTH_TOKEN);
-    http.addHeader("Authorization", authHeader);
-    
-    JsonDocument payload;
-    payload["device_id"] = DEVICE_ID;
-#endif
->>>>>>> origin/main
     
     http.addHeader("Content-Type", "application/json");
     http.setTimeout(timeoutMs);
     
-<<<<<<< HEAD
     payload["unix_time"] = unixTime;
-=======
-    payload["unix_time"] = unixTime;  // ← ZMIANA: tylko unix_time
->>>>>>> origin/main
     payload["event_type"] = eventType;
     payload["volume_ml"] = volumeML;
     payload["water_status"] = getWaterStatus();
     payload["system_status"] = "OK";
 
     if (rtcNeedsSynchronization()) {
-<<<<<<< HEAD
         payload["time_uncertain"] = true;
-=======
-        payload["time_uncertain"] = true;  // ← NOWE: optional flag
->>>>>>> origin/main
     }
 
     if (eventType == "MANUAL_NORMAL") {
@@ -159,10 +113,6 @@ bool logCycleToVPS(const PumpCycle& cycle, uint32_t unixTime) {
     
     HTTPClient http;
     
-<<<<<<< HEAD
-=======
-#if MODE_PRODUCTION
->>>>>>> origin/main
     const char* vpsUrl = getVPSURL();
     http.begin(vpsUrl);
     
@@ -171,18 +121,6 @@ bool logCycleToVPS(const PumpCycle& cycle, uint32_t unixTime) {
     
     JsonDocument payload;
     payload["device_id"] = getDeviceID();
-<<<<<<< HEAD
-=======
-#else
-    http.begin(VPS_URL);
-    
-    String authHeader = "Bearer " + String(VPS_AUTH_TOKEN);
-    http.addHeader("Authorization", authHeader);
-    
-    JsonDocument payload;
-    payload["device_id"] = DEVICE_ID;
-#endif
->>>>>>> origin/main
     
     http.addHeader("Content-Type", "application/json");
     http.setTimeout(10000);
@@ -198,22 +136,14 @@ bool logCycleToVPS(const PumpCycle& cycle, uint32_t unixTime) {
         currentStats.last_reset_timestamp = millis() / 1000;
     }
     
-<<<<<<< HEAD
     payload["unix_time"] = unixTime;
-=======
-    payload["unix_time"] = unixTime;  // ← ZMIANA: tylko unix_time
->>>>>>> origin/main
     payload["event_type"] = "AUTO_CYCLE_COMPLETE";
     payload["volume_ml"] = cycle.volume_dose;
     payload["water_status"] = getWaterStatus();
     payload["system_status"] = (cycle.error_code == 0) ? "OK" : "ERROR";
     
     if (rtcNeedsSynchronization()) {
-<<<<<<< HEAD
         payload["time_uncertain"] = true;
-=======
-        payload["time_uncertain"] = true;  // ← NOWE
->>>>>>> origin/main
     }
     
     payload["time_gap_1"] = cycle.time_gap_1;
@@ -229,18 +159,8 @@ bool logCycleToVPS(const PumpCycle& cycle, uint32_t unixTime) {
 
     payload["daily_volume_ml"] = waterAlgorithm.getDailyVolume();
     
-<<<<<<< HEAD
     payload["vps_endpoint"] = getVPSURL();
     payload["credentials_source"] = areCredentialsLoaded() ? "FRAM" : "FALLBACK";
-=======
-#if MODE_PRODUCTION
-    payload["vps_endpoint"] = getVPSURL();
-    payload["credentials_source"] = areCredentialsLoaded() ? "FRAM" : "FALLBACK";
-#else
-    payload["vps_endpoint"] = VPS_URL;
-    payload["credentials_source"] = "HARDCODED";
-#endif
->>>>>>> origin/main
     
     String algorithmSummary = "";
     algorithmSummary += "THRESHOLDS(GAP1:" + String(THRESHOLD_1) + "s,";
@@ -272,7 +192,3 @@ bool logCycleToVPS(const PumpCycle& cycle, uint32_t unixTime) {
         return false;
     }
 }
-<<<<<<< HEAD
-=======
-
->>>>>>> origin/main

@@ -1,16 +1,6 @@
-<<<<<<< HEAD
 #include "html_pages.h"
 
 const char* LOGIN_HTML = R"rawliteral(
-=======
-
-#include "html_pages.h"
-#include "../mode_config.h"
-
-#if ENABLE_WEB_SERVER
-
-const char *LOGIN_HTML = R"rawliteral(
->>>>>>> origin/main
 <!DOCTYPE html>
 <html>
   <head>
@@ -78,21 +68,12 @@ const char *LOGIN_HTML = R"rawliteral(
       .login-btn:hover {
         opacity: 0.9;
       }
-<<<<<<< HEAD
       .alert {
         padding: 15px;
         margin: 15px 0;
         border-radius: 8px;
         display: none;
       }
-=======
-      // .alert {
-      //   padding: 15px;
-      //   margin: 15px 0;
-      //   border-radius: 8px;
-      //   display: none;
-      // }
->>>>>>> origin/main
       .alert.error {
         background: #f8d7da;
         color: #721c24;
@@ -144,15 +125,8 @@ const char *LOGIN_HTML = R"rawliteral(
               if (data.success) {
                 window.location.href = "/";
               } else {
-<<<<<<< HEAD
                 let errorMessage = data.error || "Login failed";
 
-=======
-                // errorDiv.textContent = 'Invalid password';
-                let errorMessage = data.error || "Login failed";
-
-                // 🆕 NEW: Show setup instructions for unconfigured system
->>>>>>> origin/main
                 if (data.message && data.setup_instructions) {
                   errorMessage = data.message;
                   const setupDiv = document.createElement("div");
@@ -165,17 +139,9 @@ const char *LOGIN_HTML = R"rawliteral(
                   setupDiv.innerHTML = `
                         <strong>🔧 Setup Required:</strong><br>
                         ${data.setup_instructions}<br>
-<<<<<<< HEAD
                         <em>Hold button 5s during boot to enter Captive Portal</em>
                     `;
 
-=======
-                        <strong>4. FRAM> program</strong><br>
-                        <em>Then switch back to Production Mode</em>
-                    `;
-
-                  // Remove existing setup instructions
->>>>>>> origin/main
                   const existingSetup = document.querySelector(
                     ".setup-instructions"
                   );
@@ -189,22 +155,12 @@ const char *LOGIN_HTML = R"rawliteral(
                 }
 
                 errorDiv.textContent = errorMessage;
-<<<<<<< HEAD
-=======
-
->>>>>>> origin/main
                 errorDiv.style.display = "block";
               }
             })
             .catch((error) => {
-<<<<<<< HEAD
               errorDiv.textContent =
                 "Connection error - Check if device is running";
-=======
-              // errorDiv.textContent = 'Connection error';
-              errorDiv.textContent =
-                "Connection error - Check if device is in Production Mode";
->>>>>>> origin/main
               errorDiv.style.display = "block";
             });
         });
@@ -213,11 +169,7 @@ const char *LOGIN_HTML = R"rawliteral(
 </html>
 )rawliteral";
 
-<<<<<<< HEAD
 const char* DASHBOARD_HTML = R"rawliteral(
-=======
-const char *DASHBOARD_HTML = R"rawliteral(
->>>>>>> origin/main
 <!DOCTYPE html>
 <html>
   <head>
@@ -245,10 +197,6 @@ const char *DASHBOARD_HTML = R"rawliteral(
         text-align: center;
         color: white;
         position: relative;
-<<<<<<< HEAD
-=======
-        /* margin-bottom: 30px; */
->>>>>>> origin/main
       }
 
       .Header-nav {
@@ -354,25 +302,6 @@ const char *DASHBOARD_HTML = R"rawliteral(
       .btn-calibration:hover {
         background: #ccc;
       }
-<<<<<<< HEAD
-=======
-      /* .stats-display {
-        margin-top: 20px;
-        padding: 15px;
-      } */
-
-      .button.on-off.disabled{
-        background: #dc3545;
-        color: white;
-        padding: 15px 10px;
-  
-      }
-
-      .button.on-off.enabled{
-        background: #28a745;
-        color: white;
-      }
->>>>>>> origin/main
 
       .stats {
         font-weight: bold;
@@ -380,13 +309,6 @@ const char *DASHBOARD_HTML = R"rawliteral(
         margin-top: 10px;
       }
 
-<<<<<<< HEAD
-=======
-      /* .stats-values span {
-        font-weight: bold;
-      } */
-
->>>>>>> origin/main
       .stats-reset {
         font-size: 14px;
         font-weight: bold;
@@ -398,18 +320,10 @@ const char *DASHBOARD_HTML = R"rawliteral(
         width: 100%;
         margin-top: 10px;
         margin-bottom: 10px;
-<<<<<<< HEAD
-=======
-        // position: relative;
->>>>>>> origin/main
       }
 
       .alert {
         background-color: #c77777;
-<<<<<<< HEAD
-=======
-        /* display: block; */
->>>>>>> origin/main
         color: white;
         border-radius: 5px;
         margin-top: 20px;
@@ -418,10 +332,6 @@ const char *DASHBOARD_HTML = R"rawliteral(
         align-items: center;
         justify-content: center;
         font-weight: bold;
-<<<<<<< HEAD
-=======
-        // position: absolute:
->>>>>>> origin/main
       }
 
       @media (max-width: 600px) {
@@ -552,10 +462,6 @@ const char *DASHBOARD_HTML = R"rawliteral(
         color: #333;
       }
 
-<<<<<<< HEAD
-=======
-      /* Badge state colors */
->>>>>>> origin/main
       .status-badge.active-green {
         background: #27ae60;
         box-shadow: 0 2px 8px rgba(39, 174, 96, 0.3);
@@ -572,21 +478,12 @@ const char *DASHBOARD_HTML = R"rawliteral(
       }
 
       .status-badge.error-red {
-<<<<<<< HEAD
         background: #dc3545;
-=======
-        background; #dc3545
->>>>>>> origin/main
         box-shadow: 0 2px 8px rgba(231, 76, 60, 0.3);
       }
 
       .status-badge.inactive-gray {
         background: #dbdee0;
-<<<<<<< HEAD
-=======
-;
-
->>>>>>> origin/main
       }
       .process-status {
         display: flex;
@@ -595,14 +492,7 @@ const char *DASHBOARD_HTML = R"rawliteral(
         justify-content: center;
         height: 80px;
         border-radius: 5px;
-<<<<<<< HEAD
         background: #dbdee0;
-=======
-
-        /* padding: 20px; */
-        background: #dbdee0;
-        /* min-height: 80px; */
->>>>>>> origin/main
       }
 
       .process-description {
@@ -619,18 +509,9 @@ const char *DASHBOARD_HTML = R"rawliteral(
         font-weight: 600;
       }
 
-<<<<<<< HEAD
       @media (max-width: 800px) {
         .pump-controls {
           flex-direction: column;
-=======
-      /* Responsywność */
-      @media (max-width: 800px) {
-        .pump-controls {
-          flex-direction: column;
-
-          /* gap: 1.5rem; */
->>>>>>> origin/main
         }
         .pump-controls > .button {
           margin: 10px 50px;
@@ -677,10 +558,6 @@ const char *DASHBOARD_HTML = R"rawliteral(
           margin-left: 0;
           margin-top: 10px;
           margin-bottom: 10px;
-<<<<<<< HEAD
-=======
-          /* width: 30%; */
->>>>>>> origin/main
         }
         .status-grid {
           grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -690,12 +567,6 @@ const char *DASHBOARD_HTML = R"rawliteral(
         .pump-controls > .button {
           margin: 10px 10px;
         }
-<<<<<<< HEAD
-=======
-        /* .pump-control {
-          flex: 1 1 100%;
-        } */
->>>>>>> origin/main
         .badge-label {
           font-size: 9px;
         }
@@ -777,26 +648,17 @@ const char *DASHBOARD_HTML = R"rawliteral(
             class="button cycle"
             onclick="triggerNormalPump()"
           >
-<<<<<<< HEAD
             Manual Cycle
-=======
-            Manual Cycle (Max 60s)
->>>>>>> origin/main
           </button>
           <button id="stopBtn" class="button danger" onclick="stopPump()">
             Stop Pump
           </button>
-<<<<<<< HEAD
           <button
             id="onOffBtn"
             class="button on-off"
             onclick="togglePumpGlobal()"
           >
             Pump ON
-=======
-          <button id="systemToggleBtn" class="button on-off" onclick="toggleSystemState()">
-            Normal Cycle ACTIVE
->>>>>>> origin/main
           </button>
         </div>
       </div>
@@ -913,11 +775,7 @@ const char *DASHBOARD_HTML = R"rawliteral(
           .then((data) => {
             if (data.success) {
               showNotification(
-<<<<<<< HEAD
                 "Pump started for " + data.duration + "s (" + data.volume_ml + "ml)",
-=======
-                `Pump started for ${data.duration}s (${data.volume_ml}ml)`,
->>>>>>> origin/main
                 "success"
               );
             } else {
@@ -927,11 +785,7 @@ const char *DASHBOARD_HTML = R"rawliteral(
           .catch(() => showNotification("Connection error", "error"))
           .finally(() => {
             btn.disabled = false;
-<<<<<<< HEAD
             btn.textContent = "Manual Cycle";
-=======
-            btn.textContent = "Manual Cycle (Max 60s)";
->>>>>>> origin/main
             updateStatus();
           });
       }
@@ -946,11 +800,7 @@ const char *DASHBOARD_HTML = R"rawliteral(
           .then((data) => {
             if (data.success) {
               showNotification(
-<<<<<<< HEAD
                 "Extended pump started for " + data.duration + "s",
-=======
-                `Extended pump started for ${data.duration}s`,
->>>>>>> origin/main
                 "success"
               );
             } else {
@@ -987,33 +837,19 @@ const char *DASHBOARD_HTML = R"rawliteral(
           });
       }
 
-<<<<<<< HEAD
-=======
-      // Load current volume setting
->>>>>>> origin/main
       function loadVolumePerSecond() {
         fetch("/api/pump-settings")
           .then((response) => response.json())
           .then((data) => {
             if (data.success) {
-<<<<<<< HEAD
-=======
-              // Update input value to current saved value
->>>>>>> origin/main
               document.getElementById("volumePerSecond").value = parseFloat(
                 data.volume_per_second
               ).toFixed(1);
               document.getElementById(
                 "volumeStatus"
-<<<<<<< HEAD
               ).textContent = "Current: " + parseFloat(
                 data.volume_per_second
               ).toFixed(1) + " ml/s";
-=======
-              ).textContent = `Current: ${parseFloat(
-                data.volume_per_second
-              ).toFixed(1)} ml/s`;
->>>>>>> origin/main
             }
           })
           .catch((error) => {
@@ -1023,10 +859,6 @@ const char *DASHBOARD_HTML = R"rawliteral(
           });
       }
 
-<<<<<<< HEAD
-=======
-      // Update volume per second with confirmation
->>>>>>> origin/main
       function updateVolumePerSecond(event) {
         event.preventDefault();
 
@@ -1040,27 +872,14 @@ const char *DASHBOARD_HTML = R"rawliteral(
           return;
         }
 
-<<<<<<< HEAD
         const confirmMessage = "Are you sure you want to change Volume per Second to " + volumeValue.toFixed(
           1
         ) + " ml/s?\n\nThis will affect pump operations and be saved permanently.";
-=======
-        // CONFIRMATION POPUP
-        const confirmMessage = `Are you sure you want to change Volume per Second to ${volumeValue.toFixed(
-          1
-        )} ml/s?\n\nThis will affect pump operations and be saved permanently.`;
->>>>>>> origin/main
 
         if (!confirm(confirmMessage)) {
           statusSpan.textContent = "Update cancelled";
           statusSpan.style.color = "#f39c12";
-<<<<<<< HEAD
           loadVolumePerSecond();
-=======
-          // Reload original value
-          loadVolumePerSecond();
-
->>>>>>> origin/main
           return;
         }
 
@@ -1077,48 +896,29 @@ const char *DASHBOARD_HTML = R"rawliteral(
           .then((response) => response.json())
           .then((data) => {
             if (data.success) {
-<<<<<<< HEAD
               statusSpan.textContent = "Updated: " + volumeValue.toFixed(
                 1
               ) + " ml/s";
-=======
-              statusSpan.textContent = `Updated: ${volumeValue.toFixed(
-                1
-              )} ml/s`;
->>>>>>> origin/main
               statusSpan.style.color = "#27ae60";
 
               setTimeout(() => {
                 loadVolumePerSecond();
               }, 1000);
             } else {
-<<<<<<< HEAD
               statusSpan.textContent = "Error: " + (
                 data.error || "Update failed"
               );
               statusSpan.style.color = "#e74c3c";
-=======
-              statusSpan.textContent = `Error: ${
-                data.error || "Update failed"
-              }`;
-              statusSpan.style.color = "#e74c3c";
-              // Reload original value on error
->>>>>>> origin/main
               loadVolumePerSecond();
             }
           })
           .catch((error) => {
             statusSpan.textContent = "Network error";
             statusSpan.style.color = "#e74c3c";
-<<<<<<< HEAD
-=======
-            // Reload original value on error
->>>>>>> origin/main
             loadVolumePerSecond();
           });
       }
 
-<<<<<<< HEAD
       let pumpGlobalEnabled = true;
 
       function loadPumpGlobalState() {
@@ -1151,79 +951,12 @@ const char *DASHBOARD_HTML = R"rawliteral(
           })
           .catch((error) => {
             showNotification("Network error", "error");
-=======
-      // Global pump control
-      // let pumpGlobalEnabled = true;
-
-      // function loadPumpGlobalState() {
-      //   fetch("/api/pump-toggle")
-      //     .then((response) => response.json())
-      //     .then((data) => {
-      //       if (data.success) {
-      //         pumpGlobalEnabled = data.enabled;
-      //         updatePumpToggleButton(data.enabled, data.remaining_seconds);
-      //       }
-      //     })
-      //     .catch((error) => console.error("Failed to load pump state:", error));
-      // }
-
-
-
-      function toggleSystemState() {
-        const btn = document.getElementById("systemToggleBtn");
-
-        if (!btn) {
-          console.error("systemToggleBtn not found!");
-          showNotification("Button not found in DOM", "error");
-          return;
-        }
-
-        btn.disabled = true;
-        btn.textContent = "Processing...";
-
-        console.log("toggleSystemState: Sending POST to /api/system-toggle");
-
-        fetch("/api/system-toggle", { method: "POST" })
-          .then((response) => {
-            console.log("toggleSystemState: Response status:", response.status);
-
-            if (!response.ok) {
-              throw new Error(`HTTP ${response.status}`);
-            }
-
-            return response.json();
-          })
-          .then((data) => {
-            console.log("toggleSystemState: Response data:", data);
-
-            if (data.success) {
-              updateSystemToggleButton(data.system_disabled, data.remaining_seconds);
-              showNotification(data.message, "success");
-
-              if (data.note) {
-                setTimeout(() => {
-                  showNotification(data.note, "success");
-                }, 2000);
-              }
-            } else {
-              showNotification("Failed to toggle system: " + (data.error || "Unknown error"), "error");
-              // Restore button state
-              loadSystemState();
-            }
-          })
-          .catch((error) => {
-            console.error("toggleSystemState: Network error:", error);
-            showNotification("Network error: " + error.message, "error");
-            // Restore button state
-            loadSystemState();
->>>>>>> origin/main
           })
           .finally(() => {
             btn.disabled = false;
           });
       }
 
-<<<<<<< HEAD
       function updatePumpToggleButton(enabled, remainingSeconds) {
         const btn = document.getElementById("onOffBtn");
 
@@ -1241,22 +974,12 @@ const char *DASHBOARD_HTML = R"rawliteral(
           btn.style.backgroundColor = "#e74c3c";
         }
       }
-=======
-      // ============================================
-      // HARDWARE BADGE UPDATE FUNCTIONS
-      // ============================================
->>>>>>> origin/main
 
       function updateSensorBadge(badgeId, isActive) {
         const badge = document.getElementById(badgeId);
         if (!badge) return;
 
         const valueSpan = badge.querySelector(".badge-value");
-<<<<<<< HEAD
-=======
-
-        // Reset classes
->>>>>>> origin/main
         badge.className = "status-badge";
 
         if (isActive) {
@@ -1273,21 +996,12 @@ const char *DASHBOARD_HTML = R"rawliteral(
         if (!badge) return;
 
         const valueSpan = badge.querySelector(".badge-value");
-<<<<<<< HEAD
-=======
-
-        // Reset classes
->>>>>>> origin/main
         badge.className = "status-badge";
 
         if (!isActive) {
           badge.classList.add("inactive-gray");
           valueSpan.textContent = "IDLE";
         } else {
-<<<<<<< HEAD
-=======
-          // Attempt 1 = green, 2 = yellow, 3+ = orange
->>>>>>> origin/main
           if (attempt === 1) {
             badge.classList.add("active-green");
           } else if (attempt === 2) {
@@ -1295,10 +1009,6 @@ const char *DASHBOARD_HTML = R"rawliteral(
           } else if (attempt >= 3) {
             badge.classList.add("active-orange");
           } else {
-<<<<<<< HEAD
-=======
-            // Default to green if attempt unknown
->>>>>>> origin/main
             badge.classList.add("active-green");
           }
           valueSpan.textContent = "ACTIVE";
@@ -1310,11 +1020,6 @@ const char *DASHBOARD_HTML = R"rawliteral(
         if (!badge) return;
 
         const valueSpan = badge.querySelector(".badge-value");
-<<<<<<< HEAD
-=======
-
-        // Reset classes
->>>>>>> origin/main
         badge.className = "status-badge";
 
         if (hasError) {
@@ -1326,41 +1031,6 @@ const char *DASHBOARD_HTML = R"rawliteral(
         }
       }
 
-<<<<<<< HEAD
-=======
-      function loadSystemState() {
-        fetch("/api/system-toggle")
-          .then((response) => {
-            if (!response.ok) {
-              throw new Error(`HTTP ${response.status}`);
-            }
-            return response.json();
-          })
-          .then((data) => {
-            console.log("loadSystemState: Data received:", data);
-
-            if (data.success) {
-              updateSystemToggleButton(data.system_disabled, data.remaining_seconds);
-
-              // Update process description if waiting for logging
-              if (data.waiting_for_logging) {
-                const desc = document.getElementById("processDescription");
-                if (desc) {
-                  desc.textContent = data.state_description + " (System pause requested)";
-                }
-              }
-            }
-          })
-          .catch((error) => {
-            console.error("Failed to load system state:", error);
-          });
-      }
-
-      // ============================================
-      // PROCESS STATUS UPDATE FUNCTIONS
-      // ============================================
-
->>>>>>> origin/main
       function updateProcessStatus(
         descId,
         timeId,
@@ -1372,15 +1042,8 @@ const char *DASHBOARD_HTML = R"rawliteral(
 
         if (!descElement || !timeElement) return;
 
-<<<<<<< HEAD
         descElement.textContent = description || "IDLE - Waiting for sensors";
 
-=======
-        // Update description
-        descElement.textContent = description || "IDLE - Waiting for sensors";
-
-        // Update remaining time
->>>>>>> origin/main
         if (remainingSeconds && remainingSeconds > 0) {
           timeElement.textContent =
             "Remaining: " + formatTime(remainingSeconds);
@@ -1410,12 +1073,6 @@ const char *DASHBOARD_HTML = R"rawliteral(
         fetch("/api/status")
           .then((response) => response.json())
           .then((data) => {
-<<<<<<< HEAD
-=======
-            // ============================================
-            // UPDATE HARDWARE BADGES (Element 1)
-            // ============================================
->>>>>>> origin/main
             updateSensorBadge("sensor1Badge", data.sensor1_active);
             updateSensorBadge("sensor2Badge", data.sensor2_active);
             updatePumpBadge(
@@ -1425,12 +1082,6 @@ const char *DASHBOARD_HTML = R"rawliteral(
             );
             updateSystemBadge("systemBadge", data.system_error);
 
-<<<<<<< HEAD
-=======
-            // ============================================
-            // UPDATE PROCESS STATUS (Element 2)
-            // ============================================
->>>>>>> origin/main
             updateProcessStatus(
               "processDescription",
               "processTime",
@@ -1438,19 +1089,9 @@ const char *DASHBOARD_HTML = R"rawliteral(
               data.remaining_seconds
             );
 
-<<<<<<< HEAD
             document.getElementById("wifiStatus").textContent =
               data.wifi_status;
 
-=======
-            // ============================================
-            // EXISTING STATUS ITEMS (bez zmian)
-            // ============================================
-            document.getElementById("wifiStatus").textContent =
-              data.wifi_status;
-
-            // RTC display with battery warning
->>>>>>> origin/main
             const rtcText = data.rtc_time || "Error";
             const rtcInfo = data.rtc_info || "";
             const rtcElement = document.getElementById("rtcTime");
@@ -1464,11 +1105,7 @@ const char *DASHBOARD_HTML = R"rawliteral(
               rtcHTML +=
                 '<br><small style="color: #e74c3c; font-size: 0.8em; font-weight: bold;">⚠️ Battery may be dead - replace CR2032</small>';
             } else {
-<<<<<<< HEAD
               rtcHTML += '<br><small style="color: #666; font-size: 0.8em;">' + rtcInfo + '</small>';
-=======
-              rtcHTML += `<br><small style="color: #666; font-size: 0.8em;">${rtcInfo}</small>`;
->>>>>>> origin/main
             }
 
             rtcElement.innerHTML = rtcHTML;
@@ -1489,15 +1126,7 @@ const char *DASHBOARD_HTML = R"rawliteral(
               data.uptime
             );
 
-<<<<<<< HEAD
             const isRunning = data.pump_active;
-=======
-            // Button states - based on pump_active (not algorithm state)
-            const isRunning = data.pump_active;
-            const systemDisabled = data.system_disabled || false;
-
-
->>>>>>> origin/main
             document.getElementById("normalBtn").disabled = isRunning;
             document.getElementById("extendedBtn").disabled = isRunning;
             document.getElementById("stopBtn").disabled = !isRunning;
@@ -1511,11 +1140,7 @@ const char *DASHBOARD_HTML = R"rawliteral(
         const seconds = Math.floor(milliseconds / 1000);
         const hours = Math.floor(seconds / 3600);
         const minutes = Math.floor((seconds % 3600) / 60);
-<<<<<<< HEAD
         return hours + "h " + minutes + "m";
-=======
-        return `${hours}h ${minutes}m`;
->>>>>>> origin/main
       }
 
       function logout() {
@@ -1524,21 +1149,9 @@ const char *DASHBOARD_HTML = R"rawliteral(
         });
       }
 
-<<<<<<< HEAD
       setInterval(updateStatus, 2000);
       updateStatus();
 
-=======
-      // Auto-refresh every 2 seconds
-
-      setInterval(updateStatus, 2000);
-      updateStatus(); // Initial load
-
-      setInterval(loadSystemState, 2000);
-      loadSystemState(); // Initial load
-
-      // Statistics management
->>>>>>> origin/main
       function loadStatistics() {
         fetch("/api/get-statistics")
           .then((response) => response.json())
@@ -1564,37 +1177,6 @@ const char *DASHBOARD_HTML = R"rawliteral(
           });
       }
 
-<<<<<<< HEAD
-=======
-      // ============================================
-      // 🆕 SYSTEM TOGGLE BUTTON UPDATE
-      // ============================================
-
-      function updateSystemToggleButton(disabled, remainingSeconds) {
-        const btn = document.getElementById("systemToggleBtn");
-
-        if (!btn) {
-          console.error("systemToggleBtn not found in DOM!");
-          return;
-        }
-
-        if (disabled) {
-          // System PAUSED state
-          if (remainingSeconds > 0) {
-            const minutes = Math.floor(remainingSeconds / 60);
-            const seconds = remainingSeconds % 60;
-            btn.textContent = `Normal Cycle PAUSED (${minutes}:${seconds.toString().padStart(2, '0')})`;
-          } else {
-            btn.textContent = "Normal Cycle PAUSED";
-          }
-          btn.className = "button on-off disabled";
-        } else {
-          btn.textContent = "Normal Cycle ACTIVE";
-          btn.className = "button on-off enabled";
-        }
-      }
-
->>>>>>> origin/main
       function resetStatistics() {
         const confirmMessage =
           "Are you sure you want to reset error statistics?\n\nThis will set all error counters (Gap1, Gap2, Water) back to zero.\nThis action cannot be undone.";
@@ -1612,10 +1194,6 @@ const char *DASHBOARD_HTML = R"rawliteral(
           .then((data) => {
             if (data.success) {
               showNotification("Statistics reset successfully", "success");
-<<<<<<< HEAD
-=======
-              // Reload statistics immediately
->>>>>>> origin/main
               loadStatistics();
             } else {
               showNotification("Failed to reset statistics", "error");
@@ -1637,20 +1215,12 @@ const char *DASHBOARD_HTML = R"rawliteral(
 
         loadStatistics();
 
-<<<<<<< HEAD
-=======
-        // Re-enable button after a short delay
->>>>>>> origin/main
         setTimeout(() => {
           btn.disabled = false;
           btn.textContent = "Load Statistics";
         }, 1000);
       }
 
-<<<<<<< HEAD
-=======
-      // Daily Volume Management
->>>>>>> origin/main
       function loadDailyVolume() {
         fetch("/api/daily-volume")
           .then((response) => response.json())
@@ -1687,11 +1257,7 @@ const char *DASHBOARD_HTML = R"rawliteral(
                 "Daily volume reset to 0ml successfully",
                 "success"
               );
-<<<<<<< HEAD
               loadDailyVolume();
-=======
-              loadDailyVolume(); // Reload immediately
->>>>>>> origin/main
             } else {
               const errorMsg = data.error || "Reset failed";
               showNotification("Failed to reset: " + errorMsg, "error");
@@ -1706,7 +1272,6 @@ const char *DASHBOARD_HTML = R"rawliteral(
           });
       }
 
-<<<<<<< HEAD
       setInterval(loadPumpGlobalState, 30000);
 
       loadDailyVolume();
@@ -1714,17 +1279,6 @@ const char *DASHBOARD_HTML = R"rawliteral(
 
       loadVolumePerSecond();
       loadStatistics();
-=======
-      // Auto-update pump state every 30 seconds
-      // setInterval(loadPumpGlobalState, 30000);
-      
-      setInterval(loadDailyVolume, 10000);
-      
-      loadVolumePerSecond();
-      loadStatistics();
-      loadDailyVolume();
-      loadSystemState();
->>>>>>> origin/main
 
     </script>
   </body>
@@ -1732,7 +1286,6 @@ const char *DASHBOARD_HTML = R"rawliteral(
 
 )rawliteral";
 
-<<<<<<< HEAD
 String getLoginHTML() {
     return String(LOGIN_HTML);
 }
@@ -1740,16 +1293,3 @@ String getLoginHTML() {
 String getDashboardHTML() {
     return String(DASHBOARD_HTML);
 }
-=======
-String getLoginHTML()
-{
-  return String(LOGIN_HTML);
-}
-
-String getDashboardHTML()
-{
-  return String(DASHBOARD_HTML);
-}
-
-#endif // ENABLE_WEB_SERVER
->>>>>>> origin/main

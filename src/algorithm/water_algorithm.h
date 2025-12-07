@@ -27,10 +27,6 @@ private:
     uint32_t pumpStartTime;
     uint32_t lastPumpTime;
     bool permission_log;
-<<<<<<< HEAD
-=======
-    bool systemWasDisabled;
->>>>>>> origin/main
 
     bool waterFailDetected = false;
 
@@ -87,12 +83,6 @@ public:
 
     uint32_t getCurrentTimeSeconds() const { return millis() / 1000; }
 
-<<<<<<< HEAD
-=======
-    void handleSystemDisable();
-    bool isSystemDisabled() const;
-
->>>>>>> origin/main
     // Main algorithm update - call this from loop()
     void update();
 

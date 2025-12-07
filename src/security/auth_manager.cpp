@@ -1,24 +1,12 @@
-<<<<<<< HEAD
-=======
-
->>>>>>> origin/main
 #include "auth_manager.h"
 #include "../config/config.h"
 #include "../core/logging.h"
 #include <mbedtls/md.h>
-<<<<<<< HEAD
 #include "../config/credentials_manager.h"
-=======
-
-#if MODE_PRODUCTION
-    #include "../config/credentials_manager.h"
-#endif
->>>>>>> origin/main
 
 void initAuthManager() {
     LOG_INFO("Authentication manager initialized");
 
-<<<<<<< HEAD
     LOG_INFO("Using %s admin credentials", areCredentialsLoaded() ? "FRAM" : "fallback");
     if (areCredentialsLoaded()) {
         LOG_INFO("Using FRAM admin credentials");
@@ -26,20 +14,6 @@ void initAuthManager() {
         LOG_WARNING("⚠️ NO FRAM CREDENTIALS - Web authentication DISABLED!");
         LOG_WARNING("⚠️ Use Captive Portal to configure credentials!");
     }
-=======
- #if MODE_PRODUCTION
-   LOG_INFO("Using %s admin credentials", areCredentialsLoaded() ? "FRAM" : "fallback");
-    if (areCredentialsLoaded()) {
-       LOG_INFO("Using FRAM admin credentials");
-    } else {
-      LOG_WARNING("⚠️ NO FRAM CREDENTIALS - Web authentication DISABLED!");
-      LOG_WARNING("⚠️ Use Programming Mode to configure credentials!");
-    }
- #else
-   LOG_INFO("Using hardcoded admin credentials (programming mode)");
-   LOG_INFO("Programming Mode - Authentication bypassed for CLI access");
- #endif
->>>>>>> origin/main
 }
 
 bool isIPAllowed(IPAddress ip) {
@@ -75,7 +49,6 @@ String hashPassword(const String& password) {
 }
 
 bool verifyPassword(const String& password) {
-<<<<<<< HEAD
     if (!areCredentialsLoaded()) {
         LOG_ERROR("🔒 Authentication BLOCKED - No FRAM credentials loaded!");
         LOG_ERROR("🔧 Use Captive Portal to configure credentials first:");
@@ -83,26 +56,10 @@ bool verifyPassword(const String& password) {
         LOG_ERROR("   2. Connect to ESP32-WATER-SETUP WiFi");
         LOG_ERROR("   3. Configure credentials in browser");
         return false;  // Force FRAM setup!
-=======
-
-#if MODE_PRODUCTION
-
-    if (!areCredentialsLoaded()) {
-        LOG_ERROR("🔒 Authentication BLOCKED - No FRAM credentials loaded!");
-        LOG_ERROR("🔧 Use Programming Mode to configure credentials first:");
-        LOG_ERROR("   1. pio run -e programming -t upload");
-        LOG_ERROR("   2. pio device monitor -e programming");
-        LOG_ERROR("   3. FRAM> program");
-        return false;  // ✅ Force FRAM setup!
->>>>>>> origin/main
     }
     
     String inputHash = hashPassword(password);
     String expectedHash = String(getAdminPasswordHash());
-<<<<<<< HEAD
-=======
-
->>>>>>> origin/main
     
     if (expectedHash.length() == 0 || expectedHash == "NO_AUTH_REQUIRES_FRAM_PROGRAMMING") {
         LOG_ERROR("Invalid admin hash from FRAM - check credential programming");
@@ -118,17 +75,4 @@ bool verifyPassword(const String& password) {
         LOG_WARNING("💡 Verify admin password was correctly programmed to FRAM"); 
     }
     return valid;
-<<<<<<< HEAD
 }
-=======
-
-
-#else
-    // Programming mode: Allow CLI access for credential setup
-    LOG_INFO("🔧 Programming Mode - Authentication bypassed for CLI access");
-    return true;  // Allow access for credential programming
-    
-#endif
-    
-}
->>>>>>> origin/main

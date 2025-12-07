@@ -17,11 +17,7 @@
 // #define TIME_GAP_2_MAX          8    //  max oczekiwanie na drugi czujnik (TRYB_2)
 // #define THRESHOLD_1             4    // próg dla TIME_GAP_1
 // #define THRESHOLD_2             4     // próg dla TIME_GAP_2
-<<<<<<< HEAD
 // #define WATER_TRIGGER_MAX_TIME  10    // max czas na reakcję czujników po starcie pompy/musi być większy od czasu pracy pompy
-=======
-// #define WATER_TRIGGER_MAX_TIME  40    // max czas na reakcję czujników po starcie pompy/musi być większy od czasu pracy pompy
->>>>>>> origin/main
 // #define THRESHOLD_WATER         4     // próg dla WATER_TRIGGER_TIME
 // #define LOGGING_TIME            5      // czas na logowanie po cyklu
 // #define SENSOR_DEBOUNCE_TIME    1      // debouncing czujników
@@ -29,10 +25,7 @@
 // ============== PARAMETRY POMPY ==============
 #define PUMP_MAX_ATTEMPTS       3      // Maksymalna liczba prób pompy w TRYB_2
 #define SINGLE_DOSE_VOLUME      200    // ml - objętość jednej dolewki
-<<<<<<< HEAD
 // #define SINGLE_DOSE_VOLUME      20    // ml - objętość jednej dolewki
-=======
->>>>>>> origin/main
 #define FILL_WATER_MAX          2000   // ml - max dolewka na dobę
 
 // ============== SYGNALIZACJA BŁĘDÓW ==============

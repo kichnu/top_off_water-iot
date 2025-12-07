@@ -11,13 +11,6 @@
 // TYLKO DEKLARACJE (extern) - NIE DEFINICJE!
 extern const char* WIFI_SSID;
 extern const char* WIFI_PASSWORD;
-<<<<<<< HEAD
-
-=======
-extern const IPAddress STATIC_IP;
-extern const IPAddress GATEWAY;
-extern const IPAddress SUBNET;
->>>>>>> origin/main
 extern const char* ADMIN_PASSWORD_HASH;
 extern const IPAddress ALLOWED_IPS[];
 extern const int ALLOWED_IPS_COUNT;
@@ -30,13 +23,6 @@ extern bool pumpGlobalEnabled;
 extern unsigned long pumpDisabledTime;
 extern const unsigned long PUMP_AUTO_ENABLE_MS;
 
-<<<<<<< HEAD
-=======
-extern bool systemDisableRequested;
-extern unsigned long systemDisabledTime;
-extern const unsigned long SYSTEM_AUTO_ENABLE_MS;
-
->>>>>>> origin/main
 
 // Stałe mogą być tutaj
 const unsigned long SESSION_TIMEOUT_MS = 1800000; 
@@ -46,11 +32,7 @@ const int MAX_FAILED_ATTEMPTS = 10;
 const unsigned long BLOCK_DURATION_MS = 60000;
 
 struct PumpSettings {
-<<<<<<< HEAD
     uint16_t manualCycleSeconds = 10;
-=======
-    uint16_t manualCycleSeconds = 60;
->>>>>>> origin/main
     uint16_t calibrationCycleSeconds = 30;
     float volumePerSecond = 1.0;
     bool autoModeEnabled = true;
@@ -58,13 +40,6 @@ struct PumpSettings {
 
 extern PumpSettings currentPumpSettings;
 
-<<<<<<< HEAD
-=======
-void setSystemState(bool enabled);
-void checkSystemAutoEnable();
-bool isSystemDisabled();
-
->>>>>>> origin/main
 // Functions
 void checkPumpAutoEnable();
 void setPumpGlobalState(bool enabled);
@@ -73,7 +48,6 @@ void loadVolumeFromNVS();
 void saveVolumeToNVS();
 void initNVS();
 
-<<<<<<< HEAD
 // Include credentials manager for dynamic loading
 #include "credentials_manager.h"
 
@@ -85,21 +59,3 @@ void initNVS();
 #define DEVICE_ID_DYNAMIC getDeviceID()
 
 #endif
-=======
-
-#include "../mode_config.h"
-
-#if MODE_PRODUCTION
-    // Include credentials manager for dynamic loading
-    #include "credentials_manager.h"
-    
-    // Dynamic credential accessors (override hardcoded values)
-    #define WIFI_SSID_DYNAMIC getWiFiSSID()
-    #define WIFI_PASSWORD_DYNAMIC getWiFiPassword()
-    #define ADMIN_PASSWORD_HASH_DYNAMIC getAdminPasswordHash()
-    #define VPS_AUTH_TOKEN_DYNAMIC getVPSAuthToken()
-    #define DEVICE_ID_DYNAMIC getDeviceID()
-#endif
-
-#endif
->>>>>>> origin/main

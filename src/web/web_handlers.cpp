@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 #include "web_handlers.h"
 #include "web_server.h"
 #include "html_pages.h"
@@ -15,28 +14,6 @@
 #include "../config/credentials_manager.h"
 #include "../algorithm/water_algorithm.h"
 
-=======
-
-#include "web_handlers.h"
-#include "../mode_config.h"
-
-#if ENABLE_WEB_SERVER
-    #include "web_server.h"
-    #include "html_pages.h"
-    #include "../security/auth_manager.h"
-    #include "../security/session_manager.h"
-    #include "../security/rate_limiter.h"
-    #include "../hardware/pump_controller.h"
-    #include "../hardware/water_sensors.h"
-    #include "../hardware/rtc_controller.h"
-    #include "../network/wifi_manager.h"
-    #include "../config/config.h"
-    #include "../core/logging.h"
-    #include <ArduinoJson.h>
-    #include "../config/config.h"
-    #include "../algorithm/water_algorithm.h"
-    // ... RESZTA KODU POZOSTAJE BEZ ZMIAN ...
->>>>>>> origin/main
 void handleDashboard(AsyncWebServerRequest* request) {
     if (!checkAuthentication(request)) {
         request->redirect("/login");
@@ -57,37 +34,21 @@ void handleLogin(AsyncWebServerRequest* request) {
         return;
     }
 
-<<<<<<< HEAD
     // Check if FRAM credentials are loaded
-=======
-#if MODE_PRODUCTION
-    // 🔒 Check if FRAM credentials are loaded
->>>>>>> origin/main
     if (!areCredentialsLoaded()) {
         recordFailedAttempt(clientIP);
         JsonDocument error_response;
         error_response["success"] = false;
         error_response["error"] = "System not configured";
-<<<<<<< HEAD
         error_response["message"] = "FRAM credentials required. Use Captive Portal to configure.";
         error_response["setup_instructions"] = "1. Hold button 5s during boot  2. Connect to ESP32-WATER-SETUP  3. Configure credentials in browser";
-=======
-        error_response["message"] = "FRAM credentials required. Use Programming Mode to configure.";
-        error_response["setup_instructions"] = "1. pio run -e programming -t upload  2. pio device monitor -e programming  3. FRAM> program";
->>>>>>> origin/main
         
         String response_str;
         serializeJson(error_response, response_str);
         request->send(503, "application/json", response_str);  // Service Unavailable
         return;
     }
-<<<<<<< HEAD
  
-=======
-#endif
- 
-    
->>>>>>> origin/main
     if (!request->hasParam("password", true)) {
         recordFailedAttempt(clientIP);
         request->send(400, "application/json", "{\"success\":false,\"error\":\"Missing password\"}");
@@ -98,10 +59,6 @@ void handleLogin(AsyncWebServerRequest* request) {
     
     if (verifyPassword(password)) {
         String token = createSession(clientIP);
-<<<<<<< HEAD
-=======
-        // String cookie = "session_token=" + token + "; Path=/; HttpOnly; Max-Age=300";
->>>>>>> origin/main
         String cookie = "session_token=" + token + "; Path=/; HttpOnly; Max-Age=" + String(SESSION_TIMEOUT_MS / 1000);
         
         AsyncWebServerResponse* response = request->beginResponse(200, "application/json", "{\"success\":true}");
@@ -109,27 +66,14 @@ void handleLogin(AsyncWebServerRequest* request) {
         request->send(response);
     } else {
         recordFailedAttempt(clientIP);
-<<<<<<< HEAD
-=======
-        // request->send(401, "application/json", "{\"success\":false,\"error\":\"Invalid password\"}");
-
->>>>>>> origin/main
                 
         JsonDocument error_response;
         error_response["success"] = false;
         error_response["error"] = "Invalid password";
         
-<<<<<<< HEAD
         if (!areCredentialsLoaded()) {
             error_response["message"] = "System requires FRAM credential programming";
         }
-=======
-#if MODE_PRODUCTION
-        if (!areCredentialsLoaded()) {
-            error_response["message"] = "System requires FRAM credential programming";
-        }
-#endif
->>>>>>> origin/main
         
         String response_str;
         serializeJson(error_response, response_str);
@@ -178,17 +122,9 @@ void handleStatus(AsyncWebServerRequest* request) {
     // ============================================
     json["state_description"] = waterAlgorithm.getStateDescription();
     json["remaining_seconds"] = waterAlgorithm.getRemainingSeconds();
-<<<<<<< HEAD
     
     // ============================================
     // EXISTING STATUS FIELDS
-=======
-
-    json["system_disabled"] = isSystemDisabled();
-    
-    // ============================================
-    // EXISTING STATUS FIELDS (bez zmian)
->>>>>>> origin/main
     // ============================================
     json["water_status"] = getWaterStatus();
     json["pump_running"] = isPumpActive();  // kept for backwards compatibility
@@ -207,34 +143,15 @@ void handleStatus(AsyncWebServerRequest* request) {
     // ============================================
     // DEVICE INFO
     // ============================================
-<<<<<<< HEAD
     json["device_id"] = getDeviceID();
     json["credentials_source"] = areCredentialsLoaded() ? "FRAM" : "FALLBACK";
-=======
-#if MODE_PRODUCTION
-    json["device_id"] = getDeviceID();
-    json["credentials_source"] = areCredentialsLoaded() ? "FRAM" : "FALLBACK";
-    json["system_mode"] = "PRODUCTION";
->>>>>>> origin/main
     json["vps_url"] = getVPSURL();
     json["authentication_enabled"] = areCredentialsLoaded();
     
     if (!areCredentialsLoaded()) {
         json["setup_required"] = true;
-<<<<<<< HEAD
         json["setup_message"] = "Use Captive Portal to configure FRAM credentials";
     }
-=======
-        json["setup_message"] = "Use Programming Mode to configure FRAM credentials";
-    }
-#else
-    json["device_id"] = DEVICE_ID;
-    json["credentials_source"] = "HARDCODED";
-    json["system_mode"] = "PROGRAMMING";
-    json["vps_url"] = VPS_URL;
-    json["authentication_enabled"] = false;
-#endif
->>>>>>> origin/main
     
     String response;
     serializeJson(json, response);
@@ -320,10 +237,6 @@ void handlePumpSettings(AsyncWebServerRequest* request) {
         request->send(200, "application/json", response);
         
     } else if (request->method() == HTTP_POST) {
-<<<<<<< HEAD
-=======
-        // ZMIANA: Form parameter zamiast JSON body
->>>>>>> origin/main
         if (!request->hasParam("volume_per_second", true)) {
             request->send(400, "application/json", "{\"success\":false,\"error\":\"No volume_per_second parameter\"}");
             return;
@@ -472,11 +385,7 @@ void handleGetDailyVolume(AsyncWebServerRequest* request) {
     response += "\"success\":true,";
     response += "\"daily_volume\":" + String(waterAlgorithm.getDailyVolume()) + ",";
     response += "\"max_volume\":" + String(FILL_WATER_MAX) + ",";
-<<<<<<< HEAD
     response += "\"last_reset_utc_day\":" + String(waterAlgorithm.getLastResetUTCDay());
-=======
-    response += "\"last_reset_utc_day\":" + String(waterAlgorithm.getLastResetUTCDay());  // ← ZMIANA
->>>>>>> origin/main
     response += "}";
     
     request->send(200, "application/json", response);
@@ -507,11 +416,7 @@ void handleResetDailyVolume(AsyncWebServerRequest* request) {
         String response = "{";
         response += "\"success\":true,";
         response += "\"daily_volume\":" + String(waterAlgorithm.getDailyVolume()) + ",";
-<<<<<<< HEAD
         response += "\"last_reset_utc_day\":" + String(waterAlgorithm.getLastResetUTCDay());
-=======
-        response += "\"last_reset_utc_day\":" + String(waterAlgorithm.getLastResetUTCDay());  // ← ZMIANA
->>>>>>> origin/main
         response += "}";
         
         request->send(200, "application/json", response);
@@ -522,103 +427,3 @@ void handleResetDailyVolume(AsyncWebServerRequest* request) {
         LOG_WARNING("⚠️ Daily volume reset blocked - pump is active");
     }
 }
-<<<<<<< HEAD
-=======
-
-// ========================================
-// 🆕 NEW: SYSTEM DISABLE/ENABLE HANDLER
-// ========================================
-
-void handleSystemToggle(AsyncWebServerRequest* request) {
-    if (!checkAuthentication(request)) {
-        request->send(401, "text/plain", "Unauthorized");
-        return;
-    }
-    
-    if (request->method() == HTTP_GET) {
-        // ============================================
-        // GET: Return current system state
-        // ============================================
-        JsonDocument json;
-        json["success"] = true;
-        json["system_disabled"] = systemDisableRequested;
-        
-        if (systemDisableRequested && systemDisabledTime > 0) {
-            unsigned long elapsed = millis() - systemDisabledTime;
-            unsigned long remaining = 0;
-            
-            if (elapsed < SYSTEM_AUTO_ENABLE_MS) {
-                remaining = (SYSTEM_AUTO_ENABLE_MS - elapsed) / 1000;
-            }
-            
-            json["remaining_seconds"] = remaining;
-        } else {
-            json["remaining_seconds"] = 0;
-        }
-        
-        json["current_state"] = waterAlgorithm.getStateString();
-        json["state_description"] = waterAlgorithm.getStateDescription();
-        json["waiting_for_logging"] = (waterAlgorithm.getState() == STATE_LOGGING);
-        json["in_error"] = (waterAlgorithm.getState() == STATE_ERROR);
-        
-        String response;
-        serializeJson(json, response);
-        request->send(200, "application/json", response);
-        
-    } else if (request->method() == HTTP_POST) {
-        // ============================================
-        // POST: Toggle system state
-        // ============================================
-        
-        // 🔧 FIX: Inline logic - clear and explicit
-        bool wasDisabled = systemDisableRequested;
-        bool shouldDisable = !wasDisabled;  // Toggle
-        
-        LOG_INFO("System toggle: was=%s, will be=%s", 
-                 wasDisabled ? "DISABLED" : "ENABLED",
-                 shouldDisable ? "DISABLED" : "ENABLED");
-        
-        // Set new state directly
-        if (shouldDisable) {
-            // DISABLE system
-            systemDisableRequested = true;
-            systemDisabledTime = millis();
-            LOG_INFO("🛑 System disable requested via web");
-        } else {
-            // ENABLE system
-            systemDisableRequested = false;
-            systemDisabledTime = 0;
-            LOG_INFO("✅ System enabled via web");
-        }
-        
-        // Build response
-        JsonDocument json;
-        json["success"] = true;
-        json["system_disabled"] = systemDisableRequested;
-        
-        if (systemDisableRequested) {
-            json["message"] = "System will pause at safe point (30min timeout)";
-            json["remaining_seconds"] = SYSTEM_AUTO_ENABLE_MS / 1000;
-            
-            if (waterAlgorithm.getState() == STATE_LOGGING) {
-                json["note"] = "Waiting for data logging to complete...";
-            } else {
-                json["note"] = "System paused in IDLE state";
-            }
-            
-        } else {
-            json["message"] = "System enabled - normal operation resumed";
-            json["remaining_seconds"] = 0;
-        }
-        
-        String response;
-        serializeJson(json, response);
-        LOG_INFO("System toggle response: system_disabled=%s", 
-                 systemDisableRequested ? "true" : "false");
-        request->send(200, "application/json", response);
-    }
-}
-
-#endif // ENABLE_WEB_SERVER
-
->>>>>>> origin/main

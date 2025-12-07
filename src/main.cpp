@@ -1,5 +1,4 @@
 #include <Arduino.h>
-<<<<<<< HEAD
 #include "core/logging.h"
 #include "config/config.h"
 #include "config/credentials_manager.h"
@@ -18,53 +17,15 @@
 #include "provisioning/prov_detector.h"
 #include "provisioning/ap_core.h"
 #include "provisioning/ap_server.h"
-=======
-#include "mode_config.h"
-#include "core/logging.h"
-#include "hardware/rtc_controller.h"
-#include "hardware/fram_controller.h"
-#include "hardware/hardware_pins.h"
-#include "cli/cli_handler.h" 
-
-#if MODE_PROGRAMMING
-void setupProgrammingMode();
-#else  
-void setupProductionMode();
-#endif
-
-#if MODE_PROGRAMMING
-    // Programming mode includes - tylko podstawowe
-    // CLI będzie dodany później
-#else
-    // Production mode includes - pełny water system
-    #include "config/config.h"
-    #include "config/credentials_manager.h" 
-    #include "hardware/water_sensors.h"
-    #include "hardware/pump_controller.h"
-    #include "network/wifi_manager.h"
-    #include "network/vps_logger.h"
-    #include "security/auth_manager.h"
-    #include "security/session_manager.h"
-    #include "security/rate_limiter.h"
-    #include "web/web_server.h"
-    #include "algorithm/water_algorithm.h"
-#endif
->>>>>>> origin/main
 
 void setup() {
     // Initialize core systems
     initLogging();
     delay(5000); // Wait for serial monitor
     
-<<<<<<< HEAD
     Serial.println();
     Serial.println("=== ESP32-C3 Water System Starting ===");
     Serial.println("Single Mode - Captive Portal Provisioning");
-=======
-    Serial.print("=== MODE: ");
-    Serial.print(MODE_NAME);
-    Serial.println(" ===");
->>>>>>> origin/main
     
     // Check ESP32 resources
     Serial.print("ESP32 Flash size: ");
@@ -73,7 +34,6 @@ void setup() {
     Serial.print("Free heap: ");
     Serial.print(ESP.getFreeHeap());
     Serial.println(" bytes");
-<<<<<<< HEAD
 
     Serial.println();
     Serial.println("=== CHECKING PROVISIONING BUTTON ===");
@@ -136,53 +96,6 @@ void setup() {
     // === PRODUCTION MODE SETUP ===
     Serial.println();
     Serial.println("=== Production Mode - Full Water System ===");
-=======
-    
-#if MODE_PROGRAMMING
-    setupProgrammingMode();
-#else
-    setupProductionMode();
-#endif
-}
-// ===============================
-// MODE-SPECIFIC SETUP FUNCTIONS
-// ===============================
-
-#if MODE_PROGRAMMING
-void setupProgrammingMode() {
-    Serial.println();
-    Serial.println("========================================");
-    Serial.println("    ESP32-C3 FRAM PROGRAMMER v1.0");
-    Serial.println("    Programming Mode - CLI Interface");
-    Serial.println("========================================");
-    Serial.println();
-
-    // Initialize RTC and FRAM
-    initializeRTC();
-    Serial.print("RTC Status: ");
-    Serial.println(getRTCInfo());
-    
-    if (initFRAM()) {
-        Serial.println("✅ FRAM initialized successfully");
-    } else {
-        Serial.println("❌ FRAM initialization failed!");
-    }
-
-    initCLI();
-    
-    Serial.println();
-    Serial.println("=== PROGRAMMING MODE READY ===");
-    Serial.println("CLI interface will be available here");
-    Serial.println("Type 'help' for available commands");
-    Serial.println();
-}
-#else
-
-void setupProductionMode() {
-    Serial.println();
-    Serial.println("=== ESP32-C3 Water System Starting ===");
-    Serial.println("Production Mode - Full Water System");
->>>>>>> origin/main
 
     initWaterSensors();
     initPumpController();
@@ -253,26 +166,8 @@ void setupProductionMode() {
     Serial.println(getCurrentTimestamp());
 }
 
-<<<<<<< HEAD
 void loop() {
     // Production mode loop - full water system
-=======
-#endif
-
-// ===============================
-// ARDUINO SETUP/LOOP
-// ===============================
-
-void loop() {
-#if MODE_PROGRAMMING
-    static unsigned long lastBlink = 0;
-    unsigned long now = millis();
-    handleCLI();
-    delay(10);
-    
-#else
-    // Production mode loop - full water system (unchanged)
->>>>>>> origin/main
     static unsigned long lastUpdate = 0;
     unsigned long now = millis();
     
@@ -295,10 +190,6 @@ void loop() {
     updateWaterSensors();
     waterAlgorithm.update();
     checkWaterSensors();
-<<<<<<< HEAD
-=======
-    checkSystemAutoEnable();
->>>>>>> origin/main
     checkPumpAutoEnable();
 
     // Update other systems every 100ms
@@ -309,12 +200,7 @@ void loop() {
         updateWiFi();
         
         // Check for auto pump trigger
-<<<<<<< HEAD
         if (currentPumpSettings.autoModeEnabled && shouldActivatePump() && !isPumpActive()) {
-=======
-        if (currentPumpSettings.autoModeEnabled && 
-            !isSystemDisabled() && shouldActivatePump() && !isPumpActive()) {
->>>>>>> origin/main
             Serial.println("Auto pump triggered - water level low");
             triggerPump(currentPumpSettings.manualCycleSeconds, "AUTO_PUMP");
         }
@@ -322,14 +208,5 @@ void loop() {
         lastUpdate = now;
     }
 
-<<<<<<< HEAD
     delay(100);
 }
-=======
-    static unsigned long lastBlink = 0;
-    unsigned long blinkInterval = (isWiFiConnected() && isRTCWorking()) ? 2000 : 500;
-    
-    delay(100);
-#endif
-}
->>>>>>> origin/main

@@ -1,13 +1,4 @@
-<<<<<<< HEAD
 #include "credentials_manager.h"
-=======
-
-#include "credentials_manager.h"
-#include "../mode_config.h"
-
-#if MODE_PRODUCTION
-
->>>>>>> origin/main
 #include "../core/logging.h"
 #include "../hardware/fram_controller.h"
 #include "../crypto/fram_encryption.h"
@@ -24,11 +15,7 @@ bool initCredentialsManager() {
     dynamicCredentials.wifi_password = "";
     dynamicCredentials.admin_password_hash = "";
     dynamicCredentials.vps_auth_token = "";
-<<<<<<< HEAD
     dynamicCredentials.vps_url = "";
-=======
-    dynamicCredentials.vps_url = "";        // 🆕 NEW
->>>>>>> origin/main
     dynamicCredentials.device_id = "";
     dynamicCredentials.loaded_from_fram = false;
     
@@ -87,18 +74,10 @@ bool loadCredentialsFromFRAM() {
     dynamicCredentials.wifi_password = creds.wifi_password;
     dynamicCredentials.admin_password_hash = creds.admin_password;  // Already hashed
     dynamicCredentials.vps_auth_token = creds.vps_token;
-<<<<<<< HEAD
     dynamicCredentials.device_id = creds.device_name;
     dynamicCredentials.loaded_from_fram = true;
     
     // Handle VPS_URL (backward compatibility)
-=======
-
-    dynamicCredentials.device_id = creds.device_name;
-    dynamicCredentials.loaded_from_fram = true;
-    
-    // 🆕 NEW: Handle VPS_URL (backward compatibility)
->>>>>>> origin/main
     if (fram_creds.version >= 0x0003 && creds.vps_url.length() > 0) {
         dynamicCredentials.vps_url = creds.vps_url;
         LOG_INFO("VPS URL loaded from FRAM: %s", dynamicCredentials.vps_url.substring(0, 30).c_str());
@@ -124,7 +103,6 @@ bool areCredentialsLoaded() {
 }
 
 void fallbackToHardcodedCredentials() {
-<<<<<<< HEAD
     LOG_WARNING("🔄 Falling back to placeholder credentials");
     LOG_WARNING("⚠️ Web authentication will be DISABLED until FRAM is programmed!");
     
@@ -137,26 +115,6 @@ void fallbackToHardcodedCredentials() {
     dynamicCredentials.loaded_from_fram = false;
     
     // NO FALLBACK AUTHENTICATION - Force FRAM setup
-=======
-    // LOG_WARNING("🔄 Falling back to hardcoded credentials");
-
-    LOG_WARNING("🔄 Falling back to placeholder credentials");
-    LOG_WARNING("⚠️ Web authentication will be DISABLED until FRAM is programmed!");
-    
-  
-    // Use placeholder credentials from config.h - NOT FUNCTIONAL!
-    dynamicCredentials.wifi_ssid = String(WIFI_SSID);
-    dynamicCredentials.wifi_password = String(WIFI_PASSWORD);
-    // dynamicCredentials.admin_password_hash = String(ADMIN_PASSWORD_HASH);
-    dynamicCredentials.vps_auth_token = String(VPS_AUTH_TOKEN);
-    dynamicCredentials.vps_url = String(VPS_URL);        // 🆕 NEW
-    dynamicCredentials.device_id = String(DEVICE_ID);
-    dynamicCredentials.loaded_from_fram = false;
-    
-    // LOG_INFO("📌 Hardcoded fallback credentials:");
-
-    // 🔒 NO FALLBACK AUTHENTICATION - Force FRAM setup
->>>>>>> origin/main
     if (ADMIN_PASSWORD_HASH != nullptr) {
         dynamicCredentials.admin_password_hash = String(ADMIN_PASSWORD_HASH);
     } else {
@@ -164,19 +122,9 @@ void fallbackToHardcodedCredentials() {
     }
     
     LOG_INFO("📌 Placeholder fallback credentials (NON-FUNCTIONAL):");
-<<<<<<< HEAD
     LOG_INFO("  Device ID: %s", dynamicCredentials.device_id.c_str());
     LOG_INFO("  WiFi SSID: %s", dynamicCredentials.wifi_ssid.c_str());
     LOG_INFO("  VPS URL: %s", dynamicCredentials.vps_url.c_str());
-=======
-
-
-    LOG_INFO("📌 Placeholder fallback credentials (NON-FUNCTIONAL):");
-    LOG_INFO("  Device ID: %s", dynamicCredentials.device_id.c_str());
-    LOG_INFO("  WiFi SSID: %s", dynamicCredentials.wifi_ssid.c_str());
-    LOG_INFO("  VPS URL: %s", dynamicCredentials.vps_url.c_str());
-    // LOG_INFO("  Admin Hash: %s...", dynamicCredentials.admin_password_hash.substring(0, 16).c_str());
->>>>>>> origin/main
     LOG_INFO("  Admin Hash: %s", dynamicCredentials.admin_password_hash.c_str());
     LOG_WARNING("🔧 Program FRAM credentials to enable web authentication!");
 }
@@ -198,10 +146,6 @@ const char* getVPSAuthToken() {
     return dynamicCredentials.vps_auth_token.c_str();
 }
 
-<<<<<<< HEAD
-=======
-// 🆕 NEW: VPS URL accessor
->>>>>>> origin/main
 const char* getVPSURL() {
     return dynamicCredentials.vps_url.c_str();
 }
@@ -209,8 +153,3 @@ const char* getVPSURL() {
 const char* getDeviceID() {
     return dynamicCredentials.device_id.c_str();
 }
-<<<<<<< HEAD
-=======
-
-#endif // MODE_PRODUCTION
->>>>>>> origin/main

@@ -31,8 +31,4 @@ void logError(const char* format, ...);
     #define DEBUG_PRINTF(format, ...) do {} while(0)
 #endif
 
-<<<<<<< HEAD
 #endif
-=======
-#endif
->>>>>>> origin/main

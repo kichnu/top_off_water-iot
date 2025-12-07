@@ -32,10 +32,6 @@ WaterAlgorithm::WaterAlgorithm() {
     framDataLoaded = false;
     lastFRAMCleanup = millis();
     framCycles.clear();
-<<<<<<< HEAD
-=======
-    systemWasDisabled = false;
->>>>>>> origin/main
     
     loadCyclesFromStorage();
 
@@ -70,186 +66,9 @@ void WaterAlgorithm::resetCycle() {
     waterFailDetected = false;
 }
 
-<<<<<<< HEAD
 void WaterAlgorithm::update() {
     checkResetButton();
     updateErrorSignal();
-=======
-// ===============================================
-// 🆕 NEW: SYSTEM DISABLE HANDLER
-// ===============================================
-
-void WaterAlgorithm::handleSystemDisable() {
-    // Check if already in IDLE or already handling disable
-    if (currentState == STATE_IDLE) {
-        if (!systemWasDisabled) {
-            LOG_INFO("System already in IDLE state");
-            systemWasDisabled = true;
-        }
-        return;
-    }
-    
-    // 🚫 STATE_LOGGING - DON'T interrupt, let it finish
-    if (currentState == STATE_LOGGING) {
-        if (!systemWasDisabled) {
-            LOG_INFO("⏳ System disable requested but waiting for logging to complete...");
-            systemWasDisabled = true;  // Mark that we're handling it
-        }
-        return;  // Will be handled on next update() when state changes to IDLE
-    }
-    
-    // ⚠️ First time handling disable request
-    if (!systemWasDisabled) {
-        LOG_WARNING("====================================");
-        LOG_WARNING("🛑 SYSTEM DISABLE - Interrupting current cycle");
-        LOG_WARNING("====================================");
-        LOG_WARNING("Previous state: %s", getStateString());
-        LOG_WARNING("Trigger time: %lu", triggerStartTime);
-        LOG_WARNING("Pump attempts: %d/%d", pumpAttempts, PUMP_MAX_ATTEMPTS);
-        
-        systemWasDisabled = true;
-    }
-    
-    // Stop pump immediately (hardware level) if running
-    if (isPumpActive()) {
-        stopPump();
-        LOG_INFO("✅ Pump stopped due to system disable");
-    }
-    
-    // Log interrupted cycle if we have meaningful data
-    if (triggerStartTime > 0 && currentState != STATE_ERROR) {
-        LOG_INFO("Saving interrupted cycle data to FRAM...");
-        
-        // Mark cycle as interrupted (no error, just user action)
-        currentCycle.error_code = ERROR_NONE;
-        currentCycle.pump_attempts = pumpAttempts;
-        currentCycle.volume_dose = 0;  // No water delivered (interrupted)
-        
-        // Save to FRAM for debugging/history
-        saveCycleToStorage(currentCycle);
-        
-        // Log to VPS (non-critical - short timeout)
-        uint32_t unixTime = getUnixTimestamp();
-        if (logEventToVPS("SYSTEM_DISABLED_INTERRUPT", 0, unixTime)) {
-            LOG_INFO("✅ Interrupt event logged to VPS");
-        } else {
-            LOG_WARNING("⚠️ VPS logging failed (non-critical)");
-        }
-        
-        LOG_INFO("Interrupted cycle saved to FRAM");
-    } else if (currentState == STATE_ERROR) {
-        LOG_INFO("System was in ERROR state - clearing error");
-    } else {
-        LOG_INFO("No cycle data to save (early interruption)");
-    }
-    
-    // Reset to IDLE
-    LOG_INFO("Resetting algorithm to IDLE state...");
-    currentState = STATE_IDLE;
-    resetCycle();
-    
-    LOG_WARNING("====================================");
-    LOG_WARNING("✅ System paused in IDLE state");
-    LOG_WARNING("Auto-enable in 30 minutes or manual enable");
-    LOG_WARNING("====================================");
-}
-
-bool WaterAlgorithm::isSystemDisabled() const {
-    return systemDisableRequested;
-}
-
-void WaterAlgorithm::update() {
-    checkResetButton();
-    updateErrorSignal();
-
-    if (systemDisableRequested) {
-        handleSystemDisable();
-        
-        if (currentState != STATE_IDLE) {
-            return;
-        }
-        return;
-    }
-    
-    // ====================================================
-    // 🆕 CLEAR FLAG: System was disabled but now re-enabled
-    // ====================================================
-    if (systemWasDisabled && !systemDisableRequested) {
-        systemWasDisabled = false;
-        LOG_INFO("====================================");
-        LOG_INFO("✅ System re-enabled - resuming normal operation");
-        LOG_INFO("Current state: %s", getStateString());
-        LOG_INFO("Daily volume: %dml / %dml", dailyVolumeML, FILL_WATER_MAX);
-        LOG_INFO("====================================");
-
-        bool sensor1Active = readWaterSensor1();
-        bool sensor2Active = readWaterSensor2();
-        
-        LOG_INFO("Sensor states: S1=%s, S2=%s", 
-                 sensor1Active ? "ACTIVE" : "INACTIVE",
-                 sensor2Active ? "ACTIVE" : "INACTIVE");
-        
-        if (sensor1Active || sensor2Active) {
-            // 🚀 Sensors active → Start cycle immediately
-            LOG_INFO("====================================");
-            LOG_INFO("🚀 SENSORS ACTIVE - Starting cycle");
-            LOG_INFO("====================================");
-            
-            uint32_t currentTime = getCurrentTimeSeconds();
-            
-            // Initialize cycle (like a fresh trigger)
-            triggerStartTime = currentTime;
-            currentCycle.trigger_time = currentTime;
-            currentCycle.timestamp = currentTime;
-            
-            // Record sensor states and times
-            if (sensor1Active) {
-                sensor1TriggerTime = currentTime;
-                lastSensor1State = true;
-                LOG_INFO("Sensor 1 recorded as ACTIVE");
-            }
-            
-            if (sensor2Active) {
-                sensor2TriggerTime = currentTime;
-                lastSensor2State = true;
-                LOG_INFO("Sensor 2 recorded as ACTIVE");
-            }
-            
-            // Enter TRYB_1_WAIT state
-            currentState = STATE_TRYB_1_WAIT;
-            stateStartTime = currentTime;
-            waitingForSecondSensor = !(sensor1Active && sensor2Active);  // Only if both not active
-            
-            LOG_INFO("State: %s", getStateString());
-            LOG_INFO("Waiting for second sensor: %s", waitingForSecondSensor ? "YES" : "NO");
-            
-            // If both sensors already active, calculate TIME_GAP_1 immediately
-            if (sensor1Active && sensor2Active) {
-                calculateTimeGap1();
-                waitingForSecondSensor = false;
-                
-                if (sensor_time_match_function(currentCycle.time_gap_1, THRESHOLD_1)) {
-                    currentCycle.sensor_results |= PumpCycle::RESULT_GAP1_FAIL;
-                }
-                
-                currentState = STATE_TRYB_1_DELAY;
-                stateStartTime = currentTime;
-                LOG_INFO("Both sensors active immediately - TIME_GAP_1=%ds", 
-                        currentCycle.time_gap_1);
-                LOG_INFO("Entering STATE_TRYB_1_DELAY");
-            }
-            
-            LOG_INFO("====================================");
-            
-        } else {
-            // No sensors active → Normal IDLE behavior
-            LOG_INFO("No sensors active - waiting for trigger");
-            LOG_INFO("Current state: %s", getStateString());
-            LOG_INFO("Daily volume: %dml / %dml", dailyVolumeML, FILL_WATER_MAX);
-            LOG_INFO("====================================");
-        }
-    }
->>>>>>> origin/main
     
     // UTC day check - throttled to 1x/second
     static uint32_t lastDateCheck = 0;
@@ -365,26 +184,11 @@ void WaterAlgorithm::update() {
             if (currentTime - triggerStartTime >= TIME_TO_PUMP) {
                 uint16_t pumpWorkTime = calculatePumpWorkTime(currentPumpSettings.volumePerSecond);
                 
-<<<<<<< HEAD
                 if (!validatePumpWorkTime(pumpWorkTime)) {
                     LOG_ERROR("PUMP_WORK_TIME (%ds) exceeds WATER_TRIGGER_MAX_TIME (%ds)", 
                             pumpWorkTime, WATER_TRIGGER_MAX_TIME);
                     pumpWorkTime = WATER_TRIGGER_MAX_TIME - 10;
                 }
-=======
-                // if (!validatePumpWorkTime(pumpWorkTime)) {
-                //     LOG_ERROR("PUMP_WORK_TIME (%ds) exceeds WATER_TRIGGER_MAX_TIME (%ds)", 
-                //             pumpWorkTime, WATER_TRIGGER_MAX_TIME);
-                //     pumpWorkTime = WATER_TRIGGER_MAX_TIME - 10;
-                // }
-                if (!validatePumpWorkTime(pumpWorkTime)) {
-                    LOG_ERROR("PUMP_WORK_TIME (%ds) exceeds WATER_TRIGGER_MAX_TIME (%ds)", 
-                            pumpWorkTime, WATER_TRIGGER_MAX_TIME);
-                    LOG_ERROR("Reducing pump time to safe value");
-                    pumpWorkTime = WATER_TRIGGER_MAX_TIME > 5 ? WATER_TRIGGER_MAX_TIME - 5 : 1;
-                    LOG_WARNING("Adjusted pump time: %ds", pumpWorkTime);
-}
->>>>>>> origin/main
                 
                 LOG_INFO("TRYB_2: Starting pump attempt %d/%d for %ds", 
                         pumpAttempts + 1, PUMP_MAX_ATTEMPTS, pumpWorkTime);
@@ -1049,11 +853,7 @@ bool WaterAlgorithm::getErrorStatistics(uint16_t& gap1_sum, uint16_t& gap2_sum, 
 
 void WaterAlgorithm::addManualVolume(uint16_t volumeML) {
     // 🆕 NEW: Add manual pump volume to daily total
-<<<<<<< HEAD
     dailyVolumeML += volumeML;
-=======
-    // dailyVolumeML += volumeML;    //############################################################################################################################################
->>>>>>> origin/main
     
     // Save to FRAM
     if (!saveDailyVolumeToFRAM(dailyVolumeML, lastResetUTCDay)) {
