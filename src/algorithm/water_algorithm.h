@@ -7,10 +7,6 @@
 #include "../hardware/fram_controller.h"
 #include <vector>
 
-// extern uint32_t getPumpRemainingTime();  // z pump_controller.h
-// extern bool readWaterSensor1();          // z water_sensors.h  
-// extern bool readWaterSensor2();          // z water_sensors.h
-
 class WaterAlgorithm
 {
 private:
