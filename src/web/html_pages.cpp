@@ -1,3 +1,5 @@
+
+
 // #include "html_pages.h"
 
 // const char* LOGIN_HTML = R"rawliteral(
@@ -115,7 +117,7 @@
 //           const password = document.getElementById("password").value;
 //           const errorDiv = document.getElementById("error");
 
-//           fetch("api/login", {
+//           fetch("/api/login", {
 //             method: "POST",
 //             headers: { "Content-Type": "application/x-www-form-urlencoded" },
 //             body: "password=" + encodeURIComponent(password),
@@ -221,21 +223,6 @@
 //       .logout-btn:hover {
 //         background: #c82333;
 //       }
-
-//       .back-btn {
-//         margin-left: 50px;
-//         background: #6c757d;
-//         color: white;
-//         border: none;
-//         padding: 10px 20px;
-//         border-radius: 5px;
-//         cursor: pointer;
-//         font-weight: bold;
-//       }     
-//       .back-btn:hover {
-//         background: #5a6268;
-//       }     
-
 //       .card {
 //         background: white;
 //         padding: 25px;
@@ -285,7 +272,7 @@
 //         width: 30%;
 //       }
 //       .button:hover {
-//         background: #218838;
+//         opacity: 0.9;
 //         transform: translateY(-2px);
 //       }
 //       .button:disabled {
@@ -293,19 +280,27 @@
 //         cursor: not-allowed;
 //         transform: none;
 //       }
-//       .button.on-off {
-//         background: #ffc107;
+      
+//       /* System Toggle Button Styles */
+//       .button.system-on {
+//         background: #27ae60;
+//         color: white;
+//       }
+//       .button.system-off {
+//         background: #95a5a6;
 //         color: #333;
 //       }
-//       .button.on-off:hover {
-//         background: #e0a800;
+      
+//       /* Manual Cycle Toggle Button Styles */
+//       .button.cycle-on {
+//         background: #27ae60;
+//         color: white;
 //       }
-//       .button.danger {
-//         background: #dc3545;
+//       .button.cycle-off {
+//         background: #95a5a6;
+//         color: #333;
 //       }
-//       .button.danger:hover {
-//         background: #c82333;
-//       }
+      
 //       .btn-calibration {
 //         background: #dddddd;
 //         color: #333;
@@ -368,8 +363,9 @@
 //       .pump-controls {
 //         display: flex;
 //         flex-wrap: wrap;
-//         justify-content: space-between;
+//         justify-content: space-around;
 //         align-items: center;
+//         gap: 15px;
 //       }
 //       .pump-setting {
 //         display: flex;
@@ -659,21 +655,18 @@
 //         <h2>Pump Control</h2>
 //         <div class="pump-controls">
 //           <button
-//             id="normalBtn"
-//             class="button cycle"
-//             onclick="triggerNormalPump()"
+//             id="manualCycleBtn"
+//             class="button cycle-off"
+//             onclick="toggleManualCycle()"
 //           >
-//             Manual Cycle
-//           </button>
-//           <button id="stopBtn" class="button danger" onclick="stopPump()">
-//             Stop Pump
+//             Manual Cycle Off
 //           </button>
 //           <button
-//             id="onOffBtn"
-//             class="button on-off"
-//             onclick="togglePumpGlobal()"
+//             id="systemToggleBtn"
+//             class="button system-on"
+//             onclick="toggleSystem()"
 //           >
-//             Pump ON
+//             System On
 //           </button>
 //         </div>
 //       </div>
@@ -766,6 +759,16 @@
 //     </div>
 
 //     <script>
+//       // ============================================
+//       // STATE TRACKING
+//       // ============================================
+//       let systemEnabled = true;
+//       let manualCycleActive = false;
+//       let pumpCheckInterval = null;
+
+//       // ============================================
+//       // NOTIFICATION HELPER
+//       // ============================================
 //       function showNotification(message, type) {
 //         const notifications = document.getElementById("notifications");
 //         const alert = document.createElement("div");
@@ -780,31 +783,160 @@
 //         }, 5000);
 //       }
 
-//       function triggerNormalPump() {
-//         const btn = document.getElementById("normalBtn");
+//       // ============================================
+//       // SYSTEM TOGGLE (bistable ON/OFF)
+//       // ============================================
+//       function toggleSystem() {
+//         const btn = document.getElementById("systemToggleBtn");
 //         btn.disabled = true;
-//         btn.textContent = "Starting...";
 
-//         fetch("api/pump/normal", { method: "POST" })
+//         fetch("api/system-toggle", { method: "POST" })
 //           .then((response) => response.json())
 //           .then((data) => {
 //             if (data.success) {
-//               showNotification(
-//                 "Pump started for " + data.duration + "s (" + data.volume_ml + "ml)",
-//                 "success"
-//               );
+//               systemEnabled = data.enabled;
+//               updateSystemToggleButton(data.enabled, data.remaining_seconds);
+//               showNotification(data.message, "success");
 //             } else {
-//               showNotification("Failed to start pump", "error");
+//               showNotification("Failed to toggle system", "error");
 //             }
 //           })
-//           .catch(() => showNotification("Connection error", "error"))
+//           .catch((error) => {
+//             showNotification("Network error", "error");
+//           })
 //           .finally(() => {
 //             btn.disabled = false;
-//             btn.textContent = "Manual Cycle";
-//             updateStatus();
 //           });
 //       }
 
+//       function updateSystemToggleButton(enabled, remainingSeconds) {
+//         const btn = document.getElementById("systemToggleBtn");
+//         if (!btn) return;
+
+//         if (enabled) {
+//           btn.textContent = "System On";
+//           btn.className = "button system-on";
+//         } else {
+//           if (remainingSeconds && remainingSeconds > 0) {
+//             const minutes = Math.floor(remainingSeconds / 60);
+//             const seconds = remainingSeconds % 60;
+//             btn.textContent = "System Off (" + minutes + ":" + seconds.toString().padStart(2, "0") + ")";
+//           } else {
+//             btn.textContent = "System Off";
+//           }
+//           btn.className = "button system-off";
+//         }
+//       }
+
+//       function loadSystemState() {
+//         fetch("api/system-toggle")
+//           .then((response) => response.json())
+//           .then((data) => {
+//             if (data.success) {
+//               systemEnabled = data.enabled;
+//               updateSystemToggleButton(data.enabled, data.remaining_seconds);
+//             }
+//           })
+//           .catch((error) => console.error("Failed to load system state:", error));
+//       }
+
+//       // ============================================
+//       // MANUAL CYCLE TOGGLE (bistable with auto-reset)
+//       // ============================================
+//       function toggleManualCycle() {
+//         const btn = document.getElementById("manualCycleBtn");
+        
+//         if (manualCycleActive) {
+//           // Currently ON -> Turn OFF (stop pump)
+//           btn.disabled = true;
+//           btn.textContent = "Stopping...";
+
+//           fetch("api/pump/stop", { method: "POST" })
+//             .then((response) => response.json())
+//             .then((data) => {
+//               if (data.success) {
+//                 manualCycleActive = false;
+//                 updateManualCycleButton(false);
+//                 showNotification("Manual cycle stopped", "success");
+//                 stopPumpMonitoring();
+//               } else {
+//                 showNotification("Failed to stop pump", "error");
+//               }
+//             })
+//             .catch(() => showNotification("Connection error", "error"))
+//             .finally(() => {
+//               btn.disabled = false;
+//             });
+//         } else {
+//           // Currently OFF -> Turn ON (start pump)
+//           btn.disabled = true;
+//           btn.textContent = "Starting...";
+
+//           fetch("api/pump/normal", { method: "POST" })
+//             .then((response) => response.json())
+//             .then((data) => {
+//               if (data.success) {
+//                 manualCycleActive = true;
+//                 updateManualCycleButton(true);
+//                 showNotification(
+//                   "Manual cycle started for " + data.duration + "s (" + data.volume_ml + "ml)",
+//                   "success"
+//                 );
+//                 // Start monitoring pump status to auto-reset button
+//                 startPumpMonitoring();
+//               } else {
+//                 showNotification("Failed to start pump", "error");
+//               }
+//             })
+//             .catch(() => showNotification("Connection error", "error"))
+//             .finally(() => {
+//               btn.disabled = false;
+//             });
+//         }
+//       }
+
+//       function updateManualCycleButton(isActive) {
+//         const btn = document.getElementById("manualCycleBtn");
+//         if (!btn) return;
+
+//         if (isActive) {
+//           btn.textContent = "Manual Cycle On";
+//           btn.className = "button cycle-on";
+//         } else {
+//           btn.textContent = "Manual Cycle Off";
+//           btn.className = "button cycle-off";
+//         }
+//       }
+
+//       function startPumpMonitoring() {
+//         // Check pump status every second to detect when cycle ends
+//         if (pumpCheckInterval) clearInterval(pumpCheckInterval);
+        
+//         pumpCheckInterval = setInterval(() => {
+//           fetch("api/status")
+//             .then((response) => response.json())
+//             .then((data) => {
+//               if (!data.pump_active && manualCycleActive) {
+//                 // Pump finished - auto-reset button
+//                 manualCycleActive = false;
+//                 updateManualCycleButton(false);
+//                 stopPumpMonitoring();
+//               }
+//             })
+//             .catch(() => {});
+//         }, 1000);
+//       }
+
+//       function stopPumpMonitoring() {
+//         if (pumpCheckInterval) {
+//           clearInterval(pumpCheckInterval);
+//           pumpCheckInterval = null;
+//         }
+//       }
+
+//       // ============================================
+//       // EXTENDED PUMP (Calibration)
+//       // ============================================
 //       function triggerExtendedPump() {
 //         const btn = document.getElementById("extendedBtn");
 //         btn.disabled = true;
@@ -825,33 +957,14 @@
 //           .catch(() => showNotification("Connection error", "error"))
 //           .finally(() => {
 //             btn.disabled = false;
-//             btn.textContent = "Extended Cycle";
+//             btn.textContent = "Pump Calibration (30s)";
 //             updateStatus();
 //           });
 //       }
 
-//       function stopPump() {
-//         const btn = document.getElementById("stopBtn");
-//         btn.disabled = true;
-//         btn.textContent = "Stopping...";
-
-//         fetch("api/pump/stop", { method: "POST" })
-//           .then((response) => response.json())
-//           .then((data) => {
-//             if (data.success) {
-//               showNotification("Pump stopped successfully", "success");
-//             } else {
-//               showNotification("Failed to stop pump", "error");
-//             }
-//           })
-//           .catch(() => showNotification("Connection error", "error"))
-//           .finally(() => {
-//             btn.disabled = false;
-//             btn.textContent = "Stop Pump";
-//             updateStatus();
-//           });
-//       }
-
+//       // ============================================
+//       // VOLUME SETTINGS
+//       // ============================================
 //       function loadVolumePerSecond() {
 //         fetch("api/pump-settings")
 //           .then((response) => response.json())
@@ -934,62 +1047,9 @@
 //           });
 //       }
 
-//       let pumpGlobalEnabled = true;
-
-//       function loadPumpGlobalState() {
-//         fetch("api/pump-toggle")
-//           .then((response) => response.json())
-//           .then((data) => {
-//             if (data.success) {
-//               pumpGlobalEnabled = data.enabled;
-//               updatePumpToggleButton(data.enabled, data.remaining_seconds);
-//             }
-//           })
-//           .catch((error) => console.error("Failed to load pump state:", error));
-//       }
-
-//       function togglePumpGlobal() {
-//         const btn = document.getElementById("onOffBtn");
-//         btn.disabled = true;
-//         btn.textContent = "Processing...";
-
-//         fetch("api/pump-toggle", { method: "POST" })
-//           .then((response) => response.json())
-//           .then((data) => {
-//             if (data.success) {
-//               pumpGlobalEnabled = data.enabled;
-//               updatePumpToggleButton(data.enabled, data.remaining_seconds);
-//               showNotification(data.message, "success");
-//             } else {
-//               showNotification("Failed to toggle pump", "error");
-//             }
-//           })
-//           .catch((error) => {
-//             showNotification("Network error", "error");
-//           })
-//           .finally(() => {
-//             btn.disabled = false;
-//           });
-//       }
-
-//       function updatePumpToggleButton(enabled, remainingSeconds) {
-//         const btn = document.getElementById("onOffBtn");
-
-//         if (enabled) {
-//           btn.textContent = "Pump ON";
-//           btn.className = "button on-off enabled";
-//           btn.style.backgroundColor = "#27ae60";
-//         } else {
-//           const minutes = Math.floor(remainingSeconds / 60);
-//           const seconds = remainingSeconds % 60;
-//           btn.textContent = "Pump OFF (" + minutes + ":" + seconds
-//             .toString()
-//             .padStart(2, "0") + ")";
-//           btn.className = "button on-off disabled";
-//           btn.style.backgroundColor = "#e74c3c";
-//         }
-//       }
-
+//       // ============================================
+//       // STATUS BADGE UPDATES
+//       // ============================================
 //       function updateSensorBadge(badgeId, isActive) {
 //         const badge = document.getElementById(badgeId);
 //         if (!badge) return;
@@ -1030,7 +1090,7 @@
 //         }
 //       }
 
-//       function updateSystemBadge(badgeId, hasError) {
+//       function updateSystemBadge(badgeId, hasError, isDisabled) {
 //         const badge = document.getElementById(badgeId);
 //         if (!badge) return;
 
@@ -1040,6 +1100,9 @@
 //         if (hasError) {
 //           badge.classList.add("error-red");
 //           valueSpan.textContent = "ERROR";
+//         } else if (isDisabled) {
+//           badge.classList.add("inactive-gray");
+//           valueSpan.textContent = "OFF";
 //         } else {
 //           badge.classList.add("active-green");
 //           valueSpan.textContent = "OK";
@@ -1084,6 +1147,9 @@
 //         return minutes + " min " + secs + "s";
 //       }
 
+//       // ============================================
+//       // MAIN STATUS UPDATE
+//       // ============================================
 //       function updateStatus() {
 //         fetch("api/status")
 //           .then((response) => response.json())
@@ -1095,7 +1161,7 @@
 //               data.pump_active,
 //               data.pump_attempt || 0
 //             );
-//             updateSystemBadge("systemBadge", data.system_error);
+//             updateSystemBadge("systemBadge", data.system_error, data.system_disabled);
 
 //             updateProcessStatus(
 //               "processDescription",
@@ -1103,6 +1169,22 @@
 //               data.state_description,
 //               data.remaining_seconds
 //             );
+
+//             // Update system toggle button from status
+//             if (typeof data.system_disabled !== 'undefined') {
+//               systemEnabled = !data.system_disabled;
+//               updateSystemToggleButton(!data.system_disabled, data.system_remaining_seconds);
+//             }
+
+//             // Update manual cycle button based on pump state
+//             if (data.pump_active && !manualCycleActive) {
+//               // Pump is running but we didn't start it - might be auto cycle
+//               // Don't change button state
+//             } else if (!data.pump_active && manualCycleActive) {
+//               // Pump stopped - reset button
+//               manualCycleActive = false;
+//               updateManualCycleButton(false);
+//             }
 
 //             document.getElementById("wifiStatus").textContent =
 //               data.wifi_status;
@@ -1141,10 +1223,19 @@
 //               data.uptime
 //             );
 
-//             const isRunning = data.pump_active;
-//             document.getElementById("normalBtn").disabled = isRunning;
-//             document.getElementById("extendedBtn").disabled = isRunning;
-//             document.getElementById("stopBtn").disabled = !isRunning;
+//             // Disable manual cycle button when system is disabled
+//             const manualBtn = document.getElementById("manualCycleBtn");
+//             if (manualBtn && data.system_disabled) {
+//               manualBtn.disabled = true;
+//             } else if (manualBtn) {
+//               manualBtn.disabled = false;
+//             }
+
+//             // Disable calibration button when pump is running
+//             const extendedBtn = document.getElementById("extendedBtn");
+//             if (extendedBtn) {
+//               extendedBtn.disabled = data.pump_active;
+//             }
 //           })
 //           .catch((error) => {
 //             console.error("Status update failed:", error);
@@ -1164,9 +1255,9 @@
 //         });
 //       }
 
-//       setInterval(updateStatus, 2000);
-//       updateStatus();
-
+//       // ============================================
+//       // STATISTICS FUNCTIONS
+//       // ============================================
 //       function loadStatistics() {
 //         fetch("api/get-statistics")
 //           .then((response) => response.json())
@@ -1236,6 +1327,9 @@
 //         }, 1000);
 //       }
 
+//       // ============================================
+//       // DAILY VOLUME FUNCTIONS
+//       // ============================================
 //       function loadDailyVolume() {
 //         fetch("api/daily-volume")
 //           .then((response) => response.json())
@@ -1287,30 +1381,22 @@
 //           });
 //       }
 
-//               // Detect VPS proxy and change Logout to Back
-//       (function() {
-//         const localIPs = ['192.168.10.2', 'localhost', '127.0.0.1'];
-//         const isProxied = !localIPs.includes(window.location.hostname);
+//       // ============================================
+//       // INITIALIZATION
+//       // ============================================
+//       // Status update every 2 seconds
+//       setInterval(updateStatus, 2000);
+//       updateStatus();
 
-//         if (isProxied) {
-//           const logoutBtn = document.querySelector('.logout-btn');
-//           if (logoutBtn) {
-//             logoutBtn.textContent = 'Back';
-//             logoutBtn.className = 'back-btn';
-//             logoutBtn.onclick = function() {
-//               window.location.href = '/dashboard';
-//             };
-//           }
-//         }
-//       })();
-
-//       setInterval(loadPumpGlobalState, 30000);
-
-//       loadDailyVolume();
-//       setInterval(loadDailyVolume, 10000);
-
+//       // Load initial states
+//       loadSystemState();
 //       loadVolumePerSecond();
 //       loadStatistics();
+//       loadDailyVolume();
+
+//       // Periodic updates
+//       setInterval(loadSystemState, 30000);
+//       setInterval(loadDailyVolume, 10000);
 
 //     </script>
 //   </body>
@@ -1335,1425 +1421,1524 @@
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #include "html_pages.h"
 
 const char* LOGIN_HTML = R"rawliteral(
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ESP32-C3 Water System Login</title>
-
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Top Off Water - Login</title>
     <style>
-      body {
-        font-family: Arial, sans-serif;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        margin: 0;
-        padding: 0;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        min-height: 100vh;
-      }
-      .login-box {
-        background: white;
-        margin: 20px;
-        padding: 40px;
-        border-radius: 15px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-        width: 100%;
-        max-width: 400px;
-      }
-      h1 {
-        text-align: center;
-        color: #333;
-        margin-bottom: 30px;
-      }
-      .form-group {
-        margin-bottom: 20px;
-      }
-      label {
-        display: block;
-        margin-bottom: 8px;
-        font-weight: bold;
-        color: #333;
-      }
-      input[type="password"] {
-        width: 100%;
-        padding: 15px;
-        border: 2px solid #ddd;
-        border-radius: 8px;
-        font-size: 16px;
-        box-sizing: border-box;
-      }
-      input[type="password"]:focus {
-        outline: none;
-        border-color: #667eea;
-      }
-      .login-btn {
-        width: 100%;
-        padding: 15px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border: none;
-        border-radius: 8px;
-        font-size: 16px;
-        font-weight: bold;
-        cursor: pointer;
-      }
-      .login-btn:hover {
-        opacity: 0.9;
-      }
-      .alert {
-        padding: 15px;
-        margin: 15px 0;
-        border-radius: 8px;
-        display: none;
-      }
-      .alert.error {
-        background: #f8d7da;
-        color: #721c24;
-        border: 1px solid #f5c6cb;
-      }
-      .info {
-        margin-top: 20px;
-        padding: 15px;
-        background: #f8f9fa;
-        border-radius: 8px;
-        font-size: 12px;
-        color: #666;
-      }
+        :root {
+            --bg-primary: #0a0f1a;
+            --bg-card: #111827;
+            --bg-input: #1e293b;
+            --border: #2d3a4f;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent-blue: #38bdf8;
+            --accent-cyan: #22d3d5;
+            --accent-green: #22c55e;
+            --accent-red: #ef4444;
+            --radius: 12px;
+            --radius-sm: 8px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(ellipse at 20% 0%, rgba(56, 189, 248, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 100%, rgba(34, 211, 213, 0.06) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .login-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 40px;
+            border-radius: var(--radius);
+            box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+            width: 100%;
+            max-width: 400px;
+            margin: 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 30px;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-icon svg {
+            width: 24px;
+            height: 24px;
+            fill: var(--bg-primary);
+        }
+
+        h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        h1 span {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        input[type="password"] {
+            width: 100%;
+            padding: 12px 16px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 1rem;
+            color: var(--text-primary);
+        }
+
+        input[type="password"]:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+            color: var(--bg-primary);
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(56, 189, 248, 0.3);
+        }
+
+        .alert {
+            padding: 12px 16px;
+            margin: 15px 0;
+            border-radius: var(--radius-sm);
+            display: none;
+            font-size: 0.875rem;
+        }
+
+        .alert.error {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: var(--accent-red);
+        }
+
+        .info {
+            margin-top: 24px;
+            padding: 16px;
+            background: var(--bg-input);
+            border-radius: var(--radius-sm);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .info strong {
+            color: var(--text-secondary);
+        }
     </style>
-  </head>
-  <body>
+</head>
+<body>
     <div class="login-box">
-      <h1>🌱 Water System</h1>
-      <form id="loginForm">
-        <div class="form-group">
-          <label for="password">Administrator Password:</label>
-          <input type="password" id="password" name="password" required />
+        <div class="logo">
+            <div class="logo-icon">
+                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+            </div>
+            <h1>Top Off Water <span>– System</span></h1>
         </div>
-        <button type="submit" class="login-btn">Login</button>
-      </form>
-      <div id="error" class="alert error"></div>
-      <div class="info">
-        <strong>🔒 Security Features:</strong><br />
-        • Session-based authentication<br />
-        • Rate limiting & IP filtering<br />
-        • VPS event logging
-      </div>
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="password">Administrator Password</label>
+                <input type="password" id="password" name="password" required />
+            </div>
+            <button type="submit" class="login-btn">Login</button>
+        </form>
+        <div id="error" class="alert error"></div>
+        <div class="info">
+            <strong>Security Features:</strong><br />
+            • Session-based authentication<br />
+            • Rate limiting & IP filtering<br />
+            • VPS event logging
+        </div>
     </div>
     <script>
-      document
-        .getElementById("loginForm")
-        .addEventListener("submit", function (e) {
-          e.preventDefault();
-          const password = document.getElementById("password").value;
-          const errorDiv = document.getElementById("error");
+        document.getElementById("loginForm").addEventListener("submit", function(e) {
+            e.preventDefault();
+            const password = document.getElementById("password").value;
+            const errorDiv = document.getElementById("error");
 
-          fetch("/api/login", {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: "password=" + encodeURIComponent(password),
-          })
+            fetch("api/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: "password=" + encodeURIComponent(password),
+            })
             .then((response) => response.json())
             .then((data) => {
-              if (data.success) {
-                window.location.href = "/";
-              } else {
-                let errorMessage = data.error || "Login failed";
-
-                if (data.message && data.setup_instructions) {
-                  errorMessage = data.message;
-                  const setupDiv = document.createElement("div");
-                  setupDiv.style.marginTop = "15px";
-                  setupDiv.style.padding = "15px";
-                  setupDiv.style.backgroundColor = "#fff3cd";
-                  setupDiv.style.border = "1px solid #ffeaa7";
-                  setupDiv.style.borderRadius = "8px";
-                  setupDiv.style.fontSize = "14px";
-                  setupDiv.innerHTML = `
-                        <strong>🔧 Setup Required:</strong><br>
-                        ${data.setup_instructions}<br>
-                        <em>Hold button 5s during boot to enter Captive Portal</em>
-                    `;
-
-                  const existingSetup = document.querySelector(
-                    ".setup-instructions"
-                  );
-                  if (existingSetup) existingSetup.remove();
-
-                  setupDiv.className = "setup-instructions";
-                  errorDiv.parentNode.insertBefore(
-                    setupDiv,
-                    errorDiv.nextSibling
-                  );
+                if (data.success) {
+                    window.location.href = "/";
+                } else {
+                    errorDiv.textContent = data.error || "Login failed";
+                    errorDiv.style.display = "block";
                 }
-
-                errorDiv.textContent = errorMessage;
-                errorDiv.style.display = "block";
-              }
             })
             .catch((error) => {
-              errorDiv.textContent =
-                "Connection error - Check if device is running";
-              errorDiv.style.display = "block";
+                errorDiv.textContent = "Connection error - Check if device is running";
+                errorDiv.style.display = "block";
             });
         });
     </script>
-  </body>
+</body>
 </html>
 )rawliteral";
 
 const char* DASHBOARD_HTML = R"rawliteral(
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ESP32-C3 Water System Dashboard</title>
-
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Top Off Water - System</title>
     <style>
-      body {
-        font-family: Arial, sans-serif;
-        margin: 0;
-        padding: 20px;
-        background: #667eea 0%;
-        min-height: 100vh;
-      }
-      .container {
-        max-width: 1000px;
-        margin: 0 auto;
-      }
-
-      .header {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
-        color: white;
-        position: relative;
-      }
-
-      .Header-nav {
-        display: flex;
-      }
-
-      .header h1 {
-        margin: 0;
-        font-size: 32px;
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-      }
-      .logout-btn {
-        margin-left: 50px;
-        background: #dc3545;
-        color: white;
-        border: none;
-        padding: 10px 20px;
-        border-radius: 5px;
-        cursor: pointer;
-        font-weight: bold;
-      }
-      .logout-btn:hover {
-        background: #c82333;
-      }
-      .card {
-        background: white;
-        padding: 25px;
-        margin: 15px 0;
-        border-radius: 5px;
-        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-      }
-      .card h2 {
-        margin-top: 0;
-        color: #333;
-        border-bottom: 3px solid #667eea;
-        padding-bottom: 10px;
-        font-size: 24px;
-      }
-      .status-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-        gap: 15px;
-      }
-      .status-item {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 15px;
-        background: #dbdee0;
-        border-radius: 5px;
-      }
-      .status-label {
-        font-weight: bold;
-        color: #333;
-      }
-      .status-value {
-        font-weight: bold;
-        color: #333;
-      }
-      .button {
-        background: #28a745;
-        color: white;
-        border: none;
-        padding: 15px 25px;
-        border-radius: 5px;
-        cursor: pointer;
-        font-size: 16px;
-        font-weight: bold;
-        transition: all 0.3s;
-        min-width: 200px;
-        width: 30%;
-      }
-      .button:hover {
-        opacity: 0.9;
-        transform: translateY(-2px);
-      }
-      .button:disabled {
-        background: #6c757d;
-        cursor: not-allowed;
-        transform: none;
-      }
-      
-      /* System Toggle Button Styles */
-      .button.system-on {
-        background: #27ae60;
-        color: white;
-      }
-      .button.system-off {
-        background: #95a5a6;
-        color: #333;
-      }
-      
-      /* Manual Cycle Toggle Button Styles */
-      .button.cycle-on {
-        background: #27ae60;
-        color: white;
-      }
-      .button.cycle-off {
-        background: #95a5a6;
-        color: #333;
-      }
-      
-      .btn-calibration {
-        background: #dddddd;
-        color: #333;
-        width: 200px;
-      }
-      .btn-calibration.btn-stat {
-        width: 150px;
-      }
-      .btn-calibration:hover {
-        background: #ccc;
-      }
-
-      .stats {
-        font-weight: bold;
-        font-size: 14px;
-        margin-top: 10px;
-      }
-
-      .stats-reset {
-        font-size: 14px;
-        font-weight: bold;
-        margin-left: 15px;
-      }
-
-      .notifications {
-        height: 25px;
-        width: 100%;
-        margin-top: 10px;
-        margin-bottom: 10px;
-      }
-
-      .alert {
-        background-color: #c77777;
-        color: white;
-        border-radius: 5px;
-        margin-top: 20px;
-        margin-bottom: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: bold;
-      }
-
-      @media (max-width: 600px) {
-        .stats-reset {
-          margin-top: 10px;
-        }
-      }
-
-      .alert.success {
-        background: #d4edda;
-        color: #155724;
-        border: 1px solid #c3e6cb;
-      }
-      .alert.error {
-        background: #f8d7da;
-        color: #721c24;
-        border: 1px solid #f5c6cb;
-      }
-      .pump-controls {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: space-around;
-        align-items: center;
-        gap: 15px;
-      }
-      .pump-setting {
-        display: flex;
-        justify-content: space-around;
-        flex-direction: row;
-      }
-      .pump-setting-form {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 15px;
-        margin-left: 30px;
-      }
-
-      .pump-setting-form > label {
-        font-weight: bold;
-        font-size: 18px;
-      }
-
-      .pump-setting-form > input {
-        padding: 8px;
-        font-size: 18px;
-        border: 2px solid #ddd;
-        border-radius: 5px;
-        width: 50px;
-      }
-
-      .pump-setting-form > button {
-        background: #3498db;
-        color: white;
-        font-size: 18px;
-        border: none;
-        padding: 10px 20px;
-        border-radius: 5px;
-        cursor: pointer;
-      }
-
-      .rtc-error {
-        color: #e74c3c !important;
-      }
-
-      .pump-stats {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: space-between;
-        text-align: center;
-        box-sizing: border-box;
-      }
-
-      .pump-stat {
-        background-color: #f7f7f7;
-        border-radius: 5px;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-        width: 30%;
-        padding-top: 8px;
-        padding-bottom: 8px;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-      }
-
-      .stats-reset,
-      .stats-info {
-        margin-top: 0.8rem;
-        font-size: 0.9rem;
-        color: #222;
-        font-weight: 600;
-        line-height: 1.4;
-      }
-
-      .stats-reset span,
-      .stats-info span {
-        font-weight: 700;
-        color: #000;
-      }
-
-      .hardware-status {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 10px;
-        height: 80px;
-      }
-
-      .status-badge {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        padding: 15px 3px;
-        background: #dbdee0;
-        border-radius: 5px;
-        transition: all 0.3s ease;
-      }
-
-      .badge-label {
-        font-size: 11px;
-        font-weight: bold;
-        color: #333;
-        text-transform: uppercase;
-        margin-bottom: 8px;
-        letter-spacing: 0.5px;
-      }
-
-      .badge-value {
-        font-size: 15px;
-        font-weight: bold;
-        color: #333;
-      }
-
-      .status-badge.active-green {
-        background: #27ae60;
-        box-shadow: 0 2px 8px rgba(39, 174, 96, 0.3);
-      }
-
-      .status-badge.active-yellow {
-        background: #facc81ff;
-        box-shadow: 0 2px 8px rgba(243, 156, 18, 0.3);
-      }
-
-      .status-badge.active-orange {
-        background: #f58450ff;
-        box-shadow: 0 2px 8px rgba(230, 126, 34, 0.3);
-      }
-
-      .status-badge.error-red {
-        background: #dc3545;
-        box-shadow: 0 2px 8px rgba(231, 76, 60, 0.3);
-      }
-
-      .status-badge.inactive-gray {
-        background: #dbdee0;
-      }
-      .process-status {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        height: 80px;
-        border-radius: 5px;
-        background: #dbdee0;
-      }
-
-      .process-description {
-        font-size: 16px;
-        font-weight: bold;
-        color: #333;
-        margin-bottom: 8px;
-        text-align: center;
-      }
-
-      .process-time {
-        font-size: 14px;
-        color: #666;
-        font-weight: 600;
-      }
-
-      @media (max-width: 800px) {
-        .pump-controls {
-          flex-direction: column;
-        }
-        .pump-controls > .button {
-          margin: 10px 50px;
-        }
-        .button {
-          width: 60%;
-        }
-        .pump-stats {
-          flex-direction: column;
-          align-items: center;
-        }
-        .pump-stat {
-          width: 60%;
-          margin: 10px;
-        }
-        .pump-setting {
-          flex-direction: column;
-          align-items: center;
+        :root {
+            --bg-primary: #0a0f1a;
+            --bg-card: #111827;
+            --bg-card-hover: #1a2332;
+            --bg-input: #1e293b;
+            --border: #2d3a4f;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent-blue: #38bdf8;
+            --accent-cyan: #22d3d5;
+            --accent-green: #22c55e;
+            --accent-red: #ef4444;
+            --accent-orange: #f97316;
+            --accent-yellow: #eab308;
+            --shadow: 0 4px 24px rgba(0,0,0,0.4);
+            --radius: 12px;
+            --radius-sm: 8px;
         }
 
-        .button.btn-calibration {
-          width: 80%;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        .pump-setting-form {
-          flex-direction: column;
-          margin: auto;
-          width: 80%;
-          padding-bottom: 10px;
-          padding-top: 10px;
-        }
-      }
 
-      @media (max-width: 600px) {
-        .Header-nav {
-          flex-direction: column;
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.5;
         }
-        .pump-stat {
-          width: 80%;
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(ellipse at 20% 0%, rgba(56, 189, 248, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 100%, rgba(34, 211, 213, 0.06) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
         }
-        .button {
-          width: 80%;
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 16px;
+            position: relative;
+            z-index: 1;
         }
-        .logout-btn {
-          margin-left: 0;
-          margin-top: 10px;
-          margin-bottom: 10px;
+
+        /* Header */
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 0 24px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 24px;
         }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-icon svg {
+            width: 24px;
+            height: 24px;
+            fill: var(--bg-primary);
+        }
+
+        h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        h1 span {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .btn-back {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 8px 16px;
+            border-radius: var(--radius-sm);
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-back:hover {
+            background: var(--bg-card-hover);
+            color: var(--text-primary);
+        }
+
+        /* Notifications */
+        .notifications {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: var(--radius-sm);
+            font-size: 0.875rem;
+            font-weight: 500;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .alert.success {
+            background: rgba(34, 197, 94, 0.15);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            color: var(--accent-green);
+        }
+
+        .alert.error {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: var(--accent-red);
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .card-header h2 {
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+        }
+
+        .card-header-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .card-header-icon svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* ===== FIRST CARD: System Status ===== */
         .status-grid {
-          grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
         }
-      }
-      @media (max-width: 450px) {
-        .pump-controls > .button {
-          margin: 10px 10px;
+
+        .status-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
         }
-        .badge-label {
-          font-size: 9px;
+
+        @media (max-width: 600px) {
+            .status-row {
+                grid-template-columns: 1fr;
+            }
         }
-        .badge-value {
-          font-size: 12px;
+
+        .status-badge {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 10px 14px;
+            position: relative;
         }
-        .pump-setting-form > label {
-          font-size: 14px;
+
+        .status-badge .label {
+            font-size: 0.65rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            margin-bottom: 4px;
         }
-        .pump-setting-form > input {
-          font-size: 25px;
+
+        .status-badge .value {
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            font-weight: 600;
         }
-      }
+
+        .status-badge.ok {
+            background: rgba(34, 197, 94, 0.15);
+            border-color: rgba(34, 197, 94, 0.3);
+        }
+        .status-badge.ok .value { color: var(--accent-green); }
+
+        .status-badge.off .value { color: var(--text-muted); }
+
+        .status-badge.idle .value { color: var(--accent-yellow); }
+
+        .status-badge.active {
+            background: rgba(34, 197, 94, 0.15);
+            border-color: rgba(34, 197, 94, 0.3);
+        }
+        .status-badge.active .value { color: var(--accent-green); }
+
+        .status-badge.warning {
+            background: rgba(234, 179, 8, 0.15);
+            border-color: rgba(234, 179, 8, 0.3);
+        }
+        .status-badge.warning .value { color: var(--accent-yellow); }
+
+        .status-badge.danger {
+            background: rgba(249, 115, 22, 0.15);
+            border-color: rgba(249, 115, 22, 0.3);
+        }
+        .status-badge.danger .value { color: var(--accent-orange); }
+
+        .status-badge.error {
+            background: rgba(239, 68, 68, 0.15);
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+        .status-badge.error .value { color: var(--accent-red); }
+
+        .status-badge.ok::before {
+            content: '';
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 6px;
+            height: 6px;
+            background: var(--accent-green);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .status-message {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 12px 16px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .status-message .main {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+        }
+
+        .status-message .sub {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .info-item {
+            display: flex;
+            align-items: center;
+            flex-direction: column;
+            background: var(--bg-input);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+        }
+
+        .info-item .label {
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .info-item .value {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .info-item .hint {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .info-item.connected .value { color: var(--accent-green); }
+        .info-item.rtc-error .value { color: var(--accent-red); }
+
+        /* ===== SECOND CARD: Pump Control ===== */
+        .pump-controls {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 48px;
+            gap: 8px;
+            padding: 14px 20px;
+            border-radius: var(--radius-sm);
+            font-family: inherit;
+            font-size: 0.9rem;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .btn-primary {
+            background: rgba(34, 197, 94, 0.15);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            color: var(--accent-green);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);
+        }
+
+        /* Stan OFF dla przycisków bistabilnych */
+        .btn-off {
+            background: var(--bg-input);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            color: var(--text-secondary);
+        }
+
+        .btn-off:hover:not(:disabled) {
+            background: var(--bg-card-hover);
+            color: var(--text-primary);
+        }
+
+        .btn-secondary {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: var(--bg-card-hover);
+            color: var(--text-primary);
+        }
+
+        .btn-small {
+            padding: 10px 16px;
+            font-size: 0.8rem;
+        }
+
+        /* ===== THIRD CARD: Statistics ===== */
+        .stats-columns {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            align-items: start;
+        }
+
+        @media (max-width: 600px) {
+            .stats-columns {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .stat-column {
+            background: var(--bg-input);
+            border-radius: var(--radius-sm);
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .stat-column .btn {
+            width: 100%;
+        }
+
+        .stat-content {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .stat-line {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8rem;
+        }
+
+        .stat-line .stat-label {
+            color: var(--text-muted);
+        }
+
+        .stat-line .stat-value {
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+            color: var(--accent-green);
+        }
+
+        .stat-line .stat-value.neutral {
+            color: var(--text-primary);
+        }
+
+        /* Volume indicator */
+        .volume-indicator {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .volume-bar {
+            height: 8px;
+            background: var(--bg-primary);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .volume-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-blue));
+            border-radius: 4px;
+            transition: width 0.3s;
+        }
+
+        .volume-text {
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            color: var(--text-primary);
+            text-align: center;
+        }
+
+        /* ===== FOURTH CARD: Pump Settings ===== */
+        .settings-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            align-items: start;
+        }
+
+        @media (max-width: 600px) {
+            .settings-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .setting-item {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .setting-item.input-group {
+            background: var(--bg-input);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+        }
+
+        .setting-item label {
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+        }
+
+        input[type="text"],
+        input[type="number"] {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 10px 14px;
+            font-family: 'Courier New', monospace;
+            font-size: 1rem;
+            color: var(--text-primary);
+            width: 100%;
+            text-align: center;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+        }
+
+        .current-value {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-align: center;
+            margin-top: 4px;
+        }
+
+        /* Footer */
+        .footer-info {
+            text-align: center;
+            padding: 16px;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+        }
     </style>
-  </head>
-
-  <body>
+</head>
+<body>
     <div class="container">
-      <div class="header">
-        <div class="Header-nav">
-          <h1>Top Off Water - System</h1>
-          <button class="logout-btn" onclick="logout()">Logout</button>
-        </div>
+        <!-- Header -->
+        <header>
+            <div class="logo">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+                </div>
+                <h1>Top Off Water <span>– System</span></h1>
+            </div>
+            <button class="btn-back" onclick="logout()">Back</button>
+        </header>
+
+        <!-- Notifications container -->
         <div id="notifications" class="notifications"></div>
-      </div>
 
-      <div class="card">
-        <h2>System Status</h2>
-        <div class="status-grid">
-          <div class="hardware-status">
-            <div class="status-badge" id="sensor1Badge">
-              <span class="badge-label">SENSOR 1</span>
-              <span class="badge-value">OFF</span>
+        <!-- FIRST CARD: System Status -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-header-icon" style="background: rgba(56, 189, 248, 0.15);">
+                    <svg fill="currentColor" style="color: var(--accent-blue);" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                </div>
+                <h2>System Status</h2>
             </div>
-            <div class="status-badge" id="sensor2Badge">
-              <span class="badge-label">SENSOR 2</span>
-              <span class="badge-value">OFF</span>
-            </div>
-            <div class="status-badge" id="pumpBadge">
-              <span class="badge-label">PUMP</span>
-              <span class="badge-value">IDLE</span>
-            </div>
-            <div class="status-badge" id="systemBadge">
-              <span class="badge-label">SYSTEM</span>
-              <span class="badge-value">OK</span>
-            </div>
-          </div>
-          <div class="process-status">
-            <span class="process-description" id="processDescription"
-              >IDLE - Waiting for sensors</span
-            >
-            <span class="process-time" id="processTime">—</span>
-          </div>
 
-          <div class="status-item">
-            <span class="status-label">WiFi Status:</span>
-            <span class="status-value" id="wifiStatus">Loading...</span>
-          </div>
-          <div class="status-item">
-            <span class="status-label">RTC Time(UTC):</span>
-            <span class="status-value" id="rtcTime">Loading...</span>
-          </div>
-          <div class="status-item">
-            <span class="status-label">Free Memory:</span>
-            <span class="status-value" id="freeHeap">Loading...</span>
-          </div>
-          <div class="status-item">
-            <span class="status-label">Uptime:</span>
-            <span class="status-value" id="uptime">Loading...</span>
-          </div>
+            <div class="status-grid">
+                <!-- Row 1: sensor1, sensor2, pump -->
+                <div class="status-row">
+                    <div class="status-badge off" id="sensor1Badge">
+                        <span class="label">Sensor 1</span>
+                        <span class="value">OFF</span>
+                    </div>
+                    <div class="status-badge off" id="sensor2Badge">
+                        <span class="label">Sensor 2</span>
+                        <span class="value">OFF</span>
+                    </div>
+                    <div class="status-badge idle" id="pumpBadge">
+                        <span class="label">Pump</span>
+                        <span class="value">IDLE</span>
+                    </div>
+                </div>
+
+                <!-- Row 2: system, status-message, wifi status -->
+                <div class="status-row">
+                    <div class="status-badge ok" id="systemBadge">
+                        <span class="label">System</span>
+                        <span class="value">OK</span>
+                    </div>
+                    <div class="status-message">
+                        <div class="main" id="processDescription">IDLE - Waiting for sensors</div>
+                        <div class="sub" id="processTime">—</div>
+                    </div>
+                    <div class="info-item connected" id="wifiItem">
+                        <span class="label">WiFi Status</span>
+                        <span class="value" id="wifiStatus">Loading...</span>
+                    </div>
+                </div>
+
+                <!-- Row 3: RTC Time, Free Memory, Uptime -->
+                <div class="status-row">
+                    <div class="info-item" id="rtcItem">
+                        <span class="label">RTC Time (UTC)</span>
+                        <span class="value" id="rtcTime">Loading...</span>
+                        <span class="hint" id="rtcHint"></span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Free Memory</span>
+                        <span class="value" id="freeHeap">Loading...</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Uptime</span>
+                        <span class="value" id="uptime">Loading...</span>
+                    </div>
+                </div>
+            </div>
         </div>
-      </div>
 
-      <div class="card">
-        <h2>Pump Control</h2>
-        <div class="pump-controls">
-          <button
-            id="manualCycleBtn"
-            class="button cycle-off"
-            onclick="toggleManualCycle()"
-          >
-            Manual Cycle Off
-          </button>
-          <button
-            id="systemToggleBtn"
-            class="button system-on"
-            onclick="toggleSystem()"
-          >
-            System On
-          </button>
+        <!-- SECOND CARD: Pump Control -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-header-icon" style="background: rgba(34, 197, 94, 0.15);">
+                    <svg fill="currentColor" style="color: var(--accent-green);" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+                </div>
+                <h2>Pump Control</h2>
+            </div>
+
+            <div class="pump-controls">
+                <button id="manualCycleBtn" class="btn btn-off" onclick="toggleManualCycle()">
+                    Manual Cycle Off
+                </button>
+                <button id="systemToggleBtn" class="btn btn-primary" onclick="toggleSystem()">
+                    System On
+                </button>
+            </div>
         </div>
-      </div>
 
-      <div class="card">
-        <h2>Statistic</h2>
-
-        <div class="pump-stats">
-          <div class="pump-stat">
-            <button
-              id="loadStatsBtn"
-              class="button btn-calibration"
-              onclick="manualLoadStatistics()"
-            >
-              Load Statistics
-            </button>
-            <div class="stats values">
-              Err activate: <span id="gap1Value"></span><br />
-              Err deactivate: <span id="gap2Value"></span><br />
-              Err pump: <span id="waterValue"></span>
+        <!-- THIRD CARD: Statistics -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-header-icon" style="background: rgba(234, 179, 8, 0.15);">
+                    <svg fill="currentColor" style="color: var(--accent-yellow);" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
+                </div>
+                <h2>Statistics</h2>
             </div>
-          </div>
 
-          <div class="pump-stat">
-            <button
-              id="resetStatsBtn"
-              class="button btn-calibration"
-              onclick="resetStatistics()"
-            >
-              Reset Statistics
-            </button>
-            <div class="stats reset">
-              Last Reset: <span id="resetTime">Loading...</span>
-            </div>
-          </div>
+            <div class="stats-columns">
+                <!-- Column 1: Load Statistics + errors -->
+                <div class="stat-column">
+                    <button id="loadStatsBtn" class="btn btn-secondary btn-small" onclick="manualLoadStatistics()">Load Statistics</button>
+                    <div class="stat-content">
+                        <div class="stat-line">
+                            <span class="stat-label">Err activate:</span>
+                            <span class="stat-value" id="gap1Value">—</span>
+                        </div>
+                        <div class="stat-line">
+                            <span class="stat-label">Err deactivate:</span>
+                            <span class="stat-value" id="gap2Value">—</span>
+                        </div>
+                        <div class="stat-line">
+                            <span class="stat-label">Err pump:</span>
+                            <span class="stat-value" id="waterValue">—</span>
+                        </div>
+                    </div>
+                </div>
 
-          <div class="pump-stat">
-            <button
-              id="resetDailyVolumeBtn"
-              class="button btn-calibration"
-              onclick="resetDailyVolume()"
-            >
-              Reset Daily Volume
-            </button>
-            <div class="stats info">
-              Current: <span id="currentDailyVolume">Loading...</span> ml<br />
-              <small>Max: <span id="maxDailyVolume">Loading...</span> ml</small>
+                <!-- Column 2: Reset Statistics + last reset -->
+                <div class="stat-column">
+                    <button id="resetStatsBtn" class="btn btn-secondary btn-small" onclick="resetStatistics()">Reset Statistics</button>
+                    <div class="stat-content">
+                        <div class="stat-line">
+                            <span class="stat-label">Last Reset:</span>
+                            <span class="stat-value neutral" id="resetTime">—</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Column 3: Reset Daily Volume + bar -->
+                <div class="stat-column">
+                    <button id="resetDailyVolumeBtn" class="btn btn-secondary btn-small" onclick="resetDailyVolume()">Reset Daily Volume</button>
+                    <div class="stat-content">
+                        <div class="volume-indicator">
+                            <div class="volume-bar">
+                                <div class="volume-bar-fill" id="volumeBarFill"></div>
+                            </div>
+                            <div class="volume-text" id="volumeText">0 ml / 2000 ml</div>
+                        </div>
+                    </div>
+                </div>
             </div>
-          </div>
         </div>
-      </div>
 
-      <div class="card">
-        <h2>Pump Setting</h2>
-        <div class="pump-setting">
-          <button
-            id="extendedBtn"
-            class="button btn-calibration"
-            onclick="triggerExtendedPump()"
-          >
-            Pump Calibration (30s)
-          </button>
-          <form
-            class="pump-setting-form"
-            id="volumeForm"
-            onsubmit="updateVolumePerSecond(event)"
-          >
-            <div class="pump-setting-form">
-              <label for="volumePerSecond">Volume per Second (ml):</label>
-              <input
-                type="number"
-                id="volumePerSecond"
-                name="volumePerSecond"
-                min="1.0"
-                max="50.0"
-                step="0.1"
-                value="1.0"
-                required
-                placeholder="Loading..."
-              />
-              <button type="submit">Update Setting</button>
-              <span
-                id="volumeStatus"
-                style="font-size: 12px; color: #666"
-              ></span>
+        <!-- FOURTH CARD: Pump Setting -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-header-icon" style="background: rgba(249, 115, 22, 0.15);">
+                    <svg fill="currentColor" style="color: var(--accent-orange);" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+                </div>
+                <h2>Pump Setting</h2>
             </div>
-          </form>
+
+            <div class="settings-row">
+                <!-- Element 1: Pump Calibration button -->
+                <div class="setting-item">
+                    <button id="extendedBtn" class="btn btn-secondary" onclick="triggerExtendedPump()">Pump Calibration (30s)</button>
+                </div>
+
+                <!-- Element 2: Input z opisem -->
+                <div class="setting-item input-group">
+                    <label for="volumePerSecond">Volume per Second (ml)</label>
+                    <input type="number" id="volumePerSecond" min="0.1" max="50.0" step="0.1" value="1.0">
+                </div>
+
+                <!-- Element 3: Update Setting + current value -->
+                <div class="setting-item">
+                    <button class="btn btn-primary" onclick="updateVolumePerSecond()">Update Setting</button>
+                    <span class="current-value" id="volumeStatus">Current: — ml/s</span>
+                </div>
+            </div>
         </div>
-      </div>
+
+        <!-- Footer -->
+        <div class="footer-info">
+            Top Off Water System • v2.0
+        </div>
     </div>
 
     <script>
-      // ============================================
-      // STATE TRACKING
-      // ============================================
-      let systemEnabled = true;
-      let manualCycleActive = false;
-      let pumpCheckInterval = null;
+        // ============================================
+        // STATE TRACKING
+        // ============================================
+        let systemEnabled = true;
+        let manualCycleActive = false;
+        let pumpCheckInterval = null;
+        let maxDailyVolume = 2000;
 
-      // ============================================
-      // NOTIFICATION HELPER
-      // ============================================
-      function showNotification(message, type) {
-        const notifications = document.getElementById("notifications");
-        const alert = document.createElement("div");
-        alert.className = "alert " + type;
-        alert.textContent = message;
-        notifications.appendChild(alert);
+        // ============================================
+        // NOTIFICATION HELPER
+        // ============================================
+        function showNotification(message, type) {
+            const notifications = document.getElementById("notifications");
+            const alert = document.createElement("div");
+            alert.className = "alert " + type;
+            alert.textContent = message;
+            notifications.appendChild(alert);
 
-        setTimeout(() => {
-          if (notifications.contains(alert)) {
-            notifications.removeChild(alert);
-          }
-        }, 5000);
-      }
-
-      // ============================================
-      // SYSTEM TOGGLE (bistable ON/OFF)
-      // ============================================
-      function toggleSystem() {
-        const btn = document.getElementById("systemToggleBtn");
-        btn.disabled = true;
-
-        fetch("api/system-toggle", { method: "POST" })
-          .then((response) => response.json())
-          .then((data) => {
-            if (data.success) {
-              systemEnabled = data.enabled;
-              updateSystemToggleButton(data.enabled, data.remaining_seconds);
-              showNotification(data.message, "success");
-            } else {
-              showNotification("Failed to toggle system", "error");
-            }
-          })
-          .catch((error) => {
-            showNotification("Network error", "error");
-          })
-          .finally(() => {
-            btn.disabled = false;
-          });
-      }
-
-      function updateSystemToggleButton(enabled, remainingSeconds) {
-        const btn = document.getElementById("systemToggleBtn");
-        if (!btn) return;
-
-        if (enabled) {
-          btn.textContent = "System On";
-          btn.className = "button system-on";
-        } else {
-          if (remainingSeconds && remainingSeconds > 0) {
-            const minutes = Math.floor(remainingSeconds / 60);
-            const seconds = remainingSeconds % 60;
-            btn.textContent = "System Off (" + minutes + ":" + seconds.toString().padStart(2, "0") + ")";
-          } else {
-            btn.textContent = "System Off";
-          }
-          btn.className = "button system-off";
+            setTimeout(() => {
+                if (notifications.contains(alert)) {
+                    alert.style.opacity = '0';
+                    alert.style.transform = 'translateX(100%)';
+                    setTimeout(() => notifications.removeChild(alert), 300);
+                }
+            }, 4000);
         }
-      }
 
-      function loadSystemState() {
-        fetch("api/system-toggle")
-          .then((response) => response.json())
-          .then((data) => {
-            if (data.success) {
-              systemEnabled = data.enabled;
-              updateSystemToggleButton(data.enabled, data.remaining_seconds);
+        // ============================================
+        // SYSTEM TOGGLE (bistable ON/OFF)
+        // ============================================
+        function toggleSystem() {
+            const btn = document.getElementById("systemToggleBtn");
+            btn.disabled = true;
+
+            fetch("api/system-toggle", { method: "POST" })
+                .then((response) => response.json())
+                .then((data) => {
+                    if (data.success) {
+                        systemEnabled = data.enabled;
+                        updateSystemToggleButton(data.enabled, data.remaining_seconds);
+                        showNotification(data.message, "success");
+                    } else {
+                        showNotification("Failed to toggle system", "error");
+                    }
+                })
+                .catch((error) => {
+                    showNotification("Network error", "error");
+                })
+                .finally(() => {
+                    btn.disabled = false;
+                });
+        }
+
+        function updateSystemToggleButton(enabled, remainingSeconds) {
+            const btn = document.getElementById("systemToggleBtn");
+            if (!btn) return;
+
+            if (enabled) {
+                btn.textContent = "System On";
+                btn.className = "btn btn-primary";
+            } else {
+                if (remainingSeconds && remainingSeconds > 0) {
+                    const minutes = Math.floor(remainingSeconds / 60);
+                    const seconds = remainingSeconds % 60;
+                    btn.textContent = "System Off (" + minutes + ":" + seconds.toString().padStart(2, "0") + ")";
+                } else {
+                    btn.textContent = "System Off";
+                }
+                btn.className = "btn btn-off";
             }
-          })
-          .catch((error) => console.error("Failed to load system state:", error));
-      }
+        }
 
-      // ============================================
-      // MANUAL CYCLE TOGGLE (bistable with auto-reset)
-      // ============================================
-      function toggleManualCycle() {
-        const btn = document.getElementById("manualCycleBtn");
-        
-        if (manualCycleActive) {
-          // Currently ON -> Turn OFF (stop pump)
-          btn.disabled = true;
-          btn.textContent = "Stopping...";
+        function loadSystemState() {
+            fetch("api/system-toggle")
+                .then((response) => response.json())
+                .then((data) => {
+                    if (data.success) {
+                        systemEnabled = data.enabled;
+                        updateSystemToggleButton(data.enabled, data.remaining_seconds);
+                    }
+                })
+                .catch((error) => console.error("Failed to load system state:", error));
+        }
 
-          fetch("api/pump/stop", { method: "POST" })
-            .then((response) => response.json())
-            .then((data) => {
-              if (data.success) {
-                manualCycleActive = false;
-                updateManualCycleButton(false);
-                showNotification("Manual cycle stopped", "success");
-                stopPumpMonitoring();
-              } else {
-                showNotification("Failed to stop pump", "error");
-              }
-            })
-            .catch(() => showNotification("Connection error", "error"))
-            .finally(() => {
-              btn.disabled = false;
+        // ============================================
+        // MANUAL CYCLE TOGGLE (bistable with auto-reset)
+        // ============================================
+        function toggleManualCycle() {
+            const btn = document.getElementById("manualCycleBtn");
+            
+            if (manualCycleActive) {
+                btn.disabled = true;
+                btn.textContent = "Stopping...";
+
+                fetch("api/pump/stop", { method: "POST" })
+                    .then((response) => response.json())
+                    .then((data) => {
+                        if (data.success) {
+                            manualCycleActive = false;
+                            updateManualCycleButton(false);
+                            showNotification("Manual cycle stopped", "success");
+                            stopPumpMonitoring();
+                        } else {
+                            showNotification("Failed to stop pump", "error");
+                        }
+                    })
+                    .catch(() => showNotification("Connection error", "error"))
+                    .finally(() => {
+                        btn.disabled = false;
+                    });
+            } else {
+                btn.disabled = true;
+                btn.textContent = "Starting...";
+
+                fetch("api/pump/normal", { method: "POST" })
+                    .then((response) => response.json())
+                    .then((data) => {
+                        if (data.success) {
+                            manualCycleActive = true;
+                            updateManualCycleButton(true);
+                            showNotification("Manual cycle started for " + data.duration + "s", "success");
+                            startPumpMonitoring();
+                        } else {
+                            showNotification("Failed to start pump", "error");
+                        }
+                    })
+                    .catch(() => showNotification("Connection error", "error"))
+                    .finally(() => {
+                        btn.disabled = false;
+                    });
+            }
+        }
+
+        function updateManualCycleButton(isActive) {
+            const btn = document.getElementById("manualCycleBtn");
+            if (!btn) return;
+
+            if (isActive) {
+                btn.textContent = "Manual Cycle On";
+                btn.className = "btn btn-primary";
+            } else {
+                btn.textContent = "Manual Cycle Off";
+                btn.className = "btn btn-off";
+            }
+        }
+
+        function startPumpMonitoring() {
+            if (pumpCheckInterval) clearInterval(pumpCheckInterval);
+            
+            pumpCheckInterval = setInterval(() => {
+                fetch("api/status")
+                    .then((response) => response.json())
+                    .then((data) => {
+                        if (!data.pump_active && manualCycleActive) {
+                            manualCycleActive = false;
+                            updateManualCycleButton(false);
+                            stopPumpMonitoring();
+                        }
+                    })
+                    .catch(() => {});
+            }, 1000);
+        }
+
+        function stopPumpMonitoring() {
+            if (pumpCheckInterval) {
+                clearInterval(pumpCheckInterval);
+                pumpCheckInterval = null;
+            }
+        }
+
+        // ============================================
+        // EXTENDED PUMP (Calibration)
+        // ============================================
+        function triggerExtendedPump() {
+            const btn = document.getElementById("extendedBtn");
+            btn.disabled = true;
+            btn.textContent = "Starting...";
+
+            fetch("api/pump/extended", { method: "POST" })
+                .then((response) => response.json())
+                .then((data) => {
+                    if (data.success) {
+                        showNotification("Calibration pump started for " + data.duration + "s", "success");
+                    } else {
+                        showNotification("Failed to start pump", "error");
+                    }
+                })
+                .catch(() => showNotification("Connection error", "error"))
+                .finally(() => {
+                    btn.disabled = false;
+                    btn.textContent = "Pump Calibration (30s)";
+                });
+        }
+
+        // ============================================
+        // VOLUME SETTINGS
+        // ============================================
+        function loadVolumePerSecond() {
+            fetch("api/pump-settings")
+                .then((response) => response.json())
+                .then((data) => {
+                    if (data.success) {
+                        document.getElementById("volumePerSecond").value = parseFloat(data.volume_per_second).toFixed(1);
+                        document.getElementById("volumeStatus").textContent = "Current: " + parseFloat(data.volume_per_second).toFixed(1) + " ml/s";
+                    }
+                })
+                .catch((error) => {
+                    console.error("Failed to load volume setting:", error);
+                });
+        }
+
+        function updateVolumePerSecond() {
+            const volumeInput = document.getElementById("volumePerSecond");
+            const statusSpan = document.getElementById("volumeStatus");
+            const volumeValue = parseFloat(volumeInput.value);
+
+            if (volumeValue < 0.1 || volumeValue > 50.0) {
+                statusSpan.textContent = "Error: 0.1-50.0 range";
+                return;
+            }
+
+            if (!confirm("Change Volume per Second to " + volumeValue.toFixed(1) + " ml/s?")) {
+                return;
+            }
+
+            statusSpan.textContent = "Updating...";
+
+            const formData = new FormData();
+            formData.append("volume_per_second", volumeValue);
+
+            fetch("api/pump-settings", { method: "POST", body: formData })
+                .then((response) => response.json())
+                .then((data) => {
+                    if (data.success) {
+                        statusSpan.textContent = "Current: " + volumeValue.toFixed(1) + " ml/s";
+                        showNotification("Volume updated to " + volumeValue.toFixed(1) + " ml/s", "success");
+                    } else {
+                        statusSpan.textContent = "Error: " + (data.error || "Update failed");
+                    }
+                })
+                .catch((error) => {
+                    statusSpan.textContent = "Network error";
+                });
+        }
+
+        // ============================================
+        // STATUS BADGE UPDATES
+        // ============================================
+        function updateSensorBadge(badgeId, isActive) {
+            const badge = document.getElementById(badgeId);
+            if (!badge) return;
+
+            const valueSpan = badge.querySelector(".value");
+            badge.className = "status-badge";
+
+            if (isActive) {
+                badge.classList.add("active");
+                valueSpan.textContent = "ON";
+            } else {
+                badge.classList.add("off");
+                valueSpan.textContent = "OFF";
+            }
+        }
+
+        function updatePumpBadge(badgeId, isActive, attempt) {
+            const badge = document.getElementById(badgeId);
+            if (!badge) return;
+
+            const valueSpan = badge.querySelector(".value");
+            badge.className = "status-badge";
+
+            if (!isActive) {
+                badge.classList.add("idle");
+                valueSpan.textContent = "IDLE";
+            } else {
+                if (attempt === 1) {
+                    badge.classList.add("active");
+                } else if (attempt === 2) {
+                    badge.classList.add("warning");
+                } else if (attempt >= 3) {
+                    badge.classList.add("danger");
+                } else {
+                    badge.classList.add("active");
+                }
+                valueSpan.textContent = "ACTIVE";
+            }
+        }
+
+        function updateSystemBadge(badgeId, hasError, isDisabled) {
+            const badge = document.getElementById(badgeId);
+            if (!badge) return;
+
+            const valueSpan = badge.querySelector(".value");
+            badge.className = "status-badge";
+
+            if (hasError) {
+                badge.classList.add("error");
+                valueSpan.textContent = "ERROR";
+            } else if (isDisabled) {
+                badge.classList.add("off");
+                valueSpan.textContent = "OFF";
+            } else {
+                badge.classList.add("ok");
+                valueSpan.textContent = "OK";
+            }
+        }
+
+        function formatTime(seconds) {
+            if (!seconds || seconds <= 0) return "—";
+            if (seconds < 60) return seconds + " sec";
+            const minutes = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            if (secs === 0) return minutes + " min";
+            return minutes + "m " + secs + "s";
+        }
+
+        function formatUptime(milliseconds) {
+            const seconds = Math.floor(milliseconds / 1000);
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            return hours + "h " + minutes + "m";
+        }
+
+        // ============================================
+        // MAIN STATUS UPDATE
+        // ============================================
+        function updateStatus() {
+            fetch("api/status")
+                .then((response) => response.json())
+                .then((data) => {
+                    // Badges
+                    updateSensorBadge("sensor1Badge", data.sensor1_active);
+                    updateSensorBadge("sensor2Badge", data.sensor2_active);
+                    updatePumpBadge("pumpBadge", data.pump_active, data.pump_attempt || 0);
+                    updateSystemBadge("systemBadge", data.system_error, data.system_disabled);
+
+                    // Process status
+                    document.getElementById("processDescription").textContent = data.state_description || "IDLE - Waiting for sensors";
+                    document.getElementById("processTime").textContent = data.remaining_seconds > 0 ? "Remaining: " + formatTime(data.remaining_seconds) : "—";
+
+                    // System toggle sync
+                    if (typeof data.system_disabled !== 'undefined') {
+                        systemEnabled = !data.system_disabled;
+                        updateSystemToggleButton(!data.system_disabled, data.system_remaining_seconds);
+                    }
+
+                    // Manual cycle sync
+                    if (!data.pump_active && manualCycleActive) {
+                        manualCycleActive = false;
+                        updateManualCycleButton(false);
+                    }
+
+                    // WiFi status
+                    const wifiItem = document.getElementById("wifiItem");
+                    const wifiStatus = document.getElementById("wifiStatus");
+                    wifiStatus.textContent = data.wifi_status || "Unknown";
+                    if (data.wifi_connected) {
+                        wifiItem.className = "info-item connected";
+                    } else {
+                        wifiItem.className = "info-item";
+                    }
+
+                    // RTC
+                    const rtcItem = document.getElementById("rtcItem");
+                    const rtcTime = document.getElementById("rtcTime");
+                    const rtcHint = document.getElementById("rtcHint");
+                    
+                    rtcTime.textContent = data.rtc_time || "Error";
+                    
+                    if (data.rtc_battery_issue || data.rtc_needs_sync) {
+                        rtcItem.className = "info-item rtc-error";
+                        rtcHint.textContent = "⚠️ Battery issue - replace CR2032";
+                    } else {
+                        rtcItem.className = "info-item";
+                        rtcHint.textContent = data.rtc_info || "";
+                    }
+
+                    // Memory & Uptime
+                    document.getElementById("freeHeap").textContent = (data.free_heap / 1024).toFixed(1) + " KB";
+                    document.getElementById("uptime").textContent = formatUptime(data.uptime);
+
+                    // Disable buttons when needed
+                    const manualBtn = document.getElementById("manualCycleBtn");
+                    if (manualBtn) {
+                        manualBtn.disabled = data.system_disabled;
+                    }
+
+                    const extendedBtn = document.getElementById("extendedBtn");
+                    if (extendedBtn) {
+                        extendedBtn.disabled = data.pump_active;
+                    }
+                })
+                .catch((error) => {
+                    console.error("Status update failed:", error);
+                });
+        }
+
+        // ============================================
+        // STATISTICS FUNCTIONS
+        // ============================================
+        function loadStatistics() {
+            fetch("api/get-statistics")
+                .then((response) => response.json())
+                .then((data) => {
+                    if (data.success) {
+                        document.getElementById("gap1Value").textContent = data.gap1_fail_sum;
+                        document.getElementById("gap2Value").textContent = data.gap2_fail_sum;
+                        document.getElementById("waterValue").textContent = data.water_fail_sum;
+                        document.getElementById("resetTime").textContent = data.last_reset_formatted || "Unknown";
+                    }
+                })
+                .catch((error) => {
+                    console.error("Failed to load statistics:", error);
+                });
+        }
+
+        function manualLoadStatistics() {
+            const btn = document.getElementById("loadStatsBtn");
+            btn.disabled = true;
+            btn.textContent = "Loading...";
+
+            loadStatistics();
+
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.textContent = "Load Statistics";
+            }, 1000);
+        }
+
+        function resetStatistics() {
+            if (!confirm("Reset all error statistics to zero?")) return;
+
+            const btn = document.getElementById("resetStatsBtn");
+            btn.disabled = true;
+            btn.textContent = "Resetting...";
+
+            fetch("api/reset-statistics", { method: "POST" })
+                .then((response) => response.json())
+                .then((data) => {
+                    if (data.success) {
+                        showNotification("Statistics reset", "success");
+                        loadStatistics();
+                    } else {
+                        showNotification("Failed to reset", "error");
+                    }
+                })
+                .catch(() => showNotification("Network error", "error"))
+                .finally(() => {
+                    btn.disabled = false;
+                    btn.textContent = "Reset Statistics";
+                });
+        }
+
+        // ============================================
+        // DAILY VOLUME FUNCTIONS
+        // ============================================
+        function loadDailyVolume() {
+            fetch("api/daily-volume")
+                .then((response) => response.json())
+                .then((data) => {
+                    if (data.success) {
+                        const current = data.daily_volume;
+                        maxDailyVolume = data.max_volume;
+                        const percent = Math.min((current / maxDailyVolume) * 100, 100);
+                        
+                        document.getElementById("volumeBarFill").style.width = percent + "%";
+                        document.getElementById("volumeText").textContent = current + " ml / " + maxDailyVolume + " ml";
+                    }
+                })
+                .catch((error) => {
+                    console.error("Failed to load daily volume:", error);
+                });
+        }
+
+        function resetDailyVolume() {
+            if (!confirm("Reset daily volume to 0ml?")) return;
+
+            const btn = document.getElementById("resetDailyVolumeBtn");
+            btn.disabled = true;
+            btn.textContent = "Resetting...";
+
+            fetch("api/reset-daily-volume", { method: "POST" })
+                .then((response) => response.json())
+                .then((data) => {
+                    if (data.success) {
+                        showNotification("Daily volume reset", "success");
+                        loadDailyVolume();
+                    } else {
+                        showNotification("Failed: " + (data.error || "Unknown error"), "error");
+                    }
+                })
+                .catch(() => showNotification("Network error", "error"))
+                .finally(() => {
+                    btn.disabled = false;
+                    btn.textContent = "Reset Daily Volume";
+                });
+        }
+
+        // ============================================
+        // LOGOUT
+        // ============================================
+        function logout() {
+            fetch("api/logout", { method: "POST" }).then(() => {
+                window.location.href = "/login";
             });
-        } else {
-          // Currently OFF -> Turn ON (start pump)
-          btn.disabled = true;
-          btn.textContent = "Starting...";
-
-          fetch("api/pump/normal", { method: "POST" })
-            .then((response) => response.json())
-            .then((data) => {
-              if (data.success) {
-                manualCycleActive = true;
-                updateManualCycleButton(true);
-                showNotification(
-                  "Manual cycle started for " + data.duration + "s (" + data.volume_ml + "ml)",
-                  "success"
-                );
-                // Start monitoring pump status to auto-reset button
-                startPumpMonitoring();
-              } else {
-                showNotification("Failed to start pump", "error");
-              }
-            })
-            .catch(() => showNotification("Connection error", "error"))
-            .finally(() => {
-              btn.disabled = false;
-            });
-        }
-      }
-
-      function updateManualCycleButton(isActive) {
-        const btn = document.getElementById("manualCycleBtn");
-        if (!btn) return;
-
-        if (isActive) {
-          btn.textContent = "Manual Cycle On";
-          btn.className = "button cycle-on";
-        } else {
-          btn.textContent = "Manual Cycle Off";
-          btn.className = "button cycle-off";
-        }
-      }
-
-      function startPumpMonitoring() {
-        // Check pump status every second to detect when cycle ends
-        if (pumpCheckInterval) clearInterval(pumpCheckInterval);
-        
-        pumpCheckInterval = setInterval(() => {
-          fetch("api/status")
-            .then((response) => response.json())
-            .then((data) => {
-              if (!data.pump_active && manualCycleActive) {
-                // Pump finished - auto-reset button
-                manualCycleActive = false;
-                updateManualCycleButton(false);
-                stopPumpMonitoring();
-              }
-            })
-            .catch(() => {});
-        }, 1000);
-      }
-
-      function stopPumpMonitoring() {
-        if (pumpCheckInterval) {
-          clearInterval(pumpCheckInterval);
-          pumpCheckInterval = null;
-        }
-      }
-
-      // ============================================
-      // EXTENDED PUMP (Calibration)
-      // ============================================
-      function triggerExtendedPump() {
-        const btn = document.getElementById("extendedBtn");
-        btn.disabled = true;
-        btn.textContent = "Starting...";
-
-        fetch("api/pump/extended", { method: "POST" })
-          .then((response) => response.json())
-          .then((data) => {
-            if (data.success) {
-              showNotification(
-                "Extended pump started for " + data.duration + "s",
-                "success"
-              );
-            } else {
-              showNotification("Failed to start pump", "error");
-            }
-          })
-          .catch(() => showNotification("Connection error", "error"))
-          .finally(() => {
-            btn.disabled = false;
-            btn.textContent = "Pump Calibration (30s)";
-            updateStatus();
-          });
-      }
-
-      // ============================================
-      // VOLUME SETTINGS
-      // ============================================
-      function loadVolumePerSecond() {
-        fetch("api/pump-settings")
-          .then((response) => response.json())
-          .then((data) => {
-            if (data.success) {
-              document.getElementById("volumePerSecond").value = parseFloat(
-                data.volume_per_second
-              ).toFixed(1);
-              document.getElementById(
-                "volumeStatus"
-              ).textContent = "Current: " + parseFloat(
-                data.volume_per_second
-              ).toFixed(1) + " ml/s";
-            }
-          })
-          .catch((error) => {
-            console.error("Failed to load volume setting:", error);
-            document.getElementById("volumeStatus").textContent =
-              "Failed to load current setting";
-          });
-      }
-
-      function updateVolumePerSecond(event) {
-        event.preventDefault();
-
-        const volumeInput = document.getElementById("volumePerSecond");
-        const statusSpan = document.getElementById("volumeStatus");
-        const volumeValue = parseFloat(volumeInput.value);
-
-        if (volumeValue < 1 || volumeValue > 50.0) {
-          statusSpan.textContent = "Error: Value must be between 1-50.0";
-          statusSpan.style.color = "#e74c3c";
-          return;
         }
 
-        const confirmMessage = "Are you sure you want to change Volume per Second to " + volumeValue.toFixed(
-          1
-        ) + " ml/s?\n\nThis will affect pump operations and be saved permanently.";
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+        setInterval(updateStatus, 2000);
+        updateStatus();
 
-        if (!confirm(confirmMessage)) {
-          statusSpan.textContent = "Update cancelled";
-          statusSpan.style.color = "#f39c12";
-          loadVolumePerSecond();
-          return;
-        }
-
-        statusSpan.textContent = "Updating...";
-        statusSpan.style.color = "#f39c12";
-
-        const formData = new FormData();
-        formData.append("volume_per_second", volumeValue);
-
-        fetch("api/pump-settings", {
-          method: "POST",
-          body: formData,
-        })
-          .then((response) => response.json())
-          .then((data) => {
-            if (data.success) {
-              statusSpan.textContent = "Updated: " + volumeValue.toFixed(
-                1
-              ) + " ml/s";
-              statusSpan.style.color = "#27ae60";
-
-              setTimeout(() => {
-                loadVolumePerSecond();
-              }, 1000);
-            } else {
-              statusSpan.textContent = "Error: " + (
-                data.error || "Update failed"
-              );
-              statusSpan.style.color = "#e74c3c";
-              loadVolumePerSecond();
-            }
-          })
-          .catch((error) => {
-            statusSpan.textContent = "Network error";
-            statusSpan.style.color = "#e74c3c";
-            loadVolumePerSecond();
-          });
-      }
-
-      // ============================================
-      // STATUS BADGE UPDATES
-      // ============================================
-      function updateSensorBadge(badgeId, isActive) {
-        const badge = document.getElementById(badgeId);
-        if (!badge) return;
-
-        const valueSpan = badge.querySelector(".badge-value");
-        badge.className = "status-badge";
-
-        if (isActive) {
-          badge.classList.add("active-green");
-          valueSpan.textContent = "ON";
-        } else {
-          badge.classList.add("inactive-gray");
-          valueSpan.textContent = "OFF";
-        }
-      }
-
-      function updatePumpBadge(badgeId, isActive, attempt) {
-        const badge = document.getElementById(badgeId);
-        if (!badge) return;
-
-        const valueSpan = badge.querySelector(".badge-value");
-        badge.className = "status-badge";
-
-        if (!isActive) {
-          badge.classList.add("inactive-gray");
-          valueSpan.textContent = "IDLE";
-        } else {
-          if (attempt === 1) {
-            badge.classList.add("active-green");
-          } else if (attempt === 2) {
-            badge.classList.add("active-yellow");
-          } else if (attempt >= 3) {
-            badge.classList.add("active-orange");
-          } else {
-            badge.classList.add("active-green");
-          }
-          valueSpan.textContent = "ACTIVE";
-        }
-      }
-
-      function updateSystemBadge(badgeId, hasError, isDisabled) {
-        const badge = document.getElementById(badgeId);
-        if (!badge) return;
-
-        const valueSpan = badge.querySelector(".badge-value");
-        badge.className = "status-badge";
-
-        if (hasError) {
-          badge.classList.add("error-red");
-          valueSpan.textContent = "ERROR";
-        } else if (isDisabled) {
-          badge.classList.add("inactive-gray");
-          valueSpan.textContent = "OFF";
-        } else {
-          badge.classList.add("active-green");
-          valueSpan.textContent = "OK";
-        }
-      }
-
-      function updateProcessStatus(
-        descId,
-        timeId,
-        description,
-        remainingSeconds
-      ) {
-        const descElement = document.getElementById(descId);
-        const timeElement = document.getElementById(timeId);
-
-        if (!descElement || !timeElement) return;
-
-        descElement.textContent = description || "IDLE - Waiting for sensors";
-
-        if (remainingSeconds && remainingSeconds > 0) {
-          timeElement.textContent =
-            "Remaining: " + formatTime(remainingSeconds);
-        } else {
-          timeElement.textContent = "—";
-        }
-      }
-
-      function formatTime(seconds) {
-        if (!seconds || seconds <= 0) return "0 sec";
-
-        if (seconds < 60) {
-          return seconds + " sec";
-        }
-
-        const minutes = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-
-        if (secs === 0) {
-          return minutes + " min";
-        }
-
-        return minutes + " min " + secs + "s";
-      }
-
-      // ============================================
-      // MAIN STATUS UPDATE
-      // ============================================
-      function updateStatus() {
-        fetch("api/status")
-          .then((response) => response.json())
-          .then((data) => {
-            updateSensorBadge("sensor1Badge", data.sensor1_active);
-            updateSensorBadge("sensor2Badge", data.sensor2_active);
-            updatePumpBadge(
-              "pumpBadge",
-              data.pump_active,
-              data.pump_attempt || 0
-            );
-            updateSystemBadge("systemBadge", data.system_error, data.system_disabled);
-
-            updateProcessStatus(
-              "processDescription",
-              "processTime",
-              data.state_description,
-              data.remaining_seconds
-            );
-
-            // Update system toggle button from status
-            if (typeof data.system_disabled !== 'undefined') {
-              systemEnabled = !data.system_disabled;
-              updateSystemToggleButton(!data.system_disabled, data.system_remaining_seconds);
-            }
-
-            // Update manual cycle button based on pump state
-            if (data.pump_active && !manualCycleActive) {
-              // Pump is running but we didn't start it - might be auto cycle
-              // Don't change button state
-            } else if (!data.pump_active && manualCycleActive) {
-              // Pump stopped - reset button
-              manualCycleActive = false;
-              updateManualCycleButton(false);
-            }
-
-            document.getElementById("wifiStatus").textContent =
-              data.wifi_status;
-
-            const rtcText = data.rtc_time || "Error";
-            const rtcInfo = data.rtc_info || "";
-            const rtcElement = document.getElementById("rtcTime");
-
-            let rtcHTML = rtcText;
-
-            if (
-              data.rtc_battery_issue === true ||
-              data.rtc_needs_sync === true
-            ) {
-              rtcHTML +=
-                '<br><small style="color: #e74c3c; font-size: 0.8em; font-weight: bold;">⚠️ Battery may be dead - replace CR2032</small>';
-            } else {
-              rtcHTML += '<br><small style="color: #666; font-size: 0.8em;">' + rtcInfo + '</small>';
-            }
-
-            rtcElement.innerHTML = rtcHTML;
-
-            if (
-              data.rtc_hardware === false ||
-              data.rtc_battery_issue === true ||
-              data.rtc_needs_sync === true
-            ) {
-              rtcElement.classList.add("rtc-error");
-            } else {
-              rtcElement.classList.remove("rtc-error");
-            }
-
-            document.getElementById("freeHeap").textContent =
-              (data.free_heap / 1024).toFixed(1) + " KB";
-            document.getElementById("uptime").textContent = formatUptime(
-              data.uptime
-            );
-
-            // Disable manual cycle button when system is disabled
-            const manualBtn = document.getElementById("manualCycleBtn");
-            if (manualBtn && data.system_disabled) {
-              manualBtn.disabled = true;
-            } else if (manualBtn) {
-              manualBtn.disabled = false;
-            }
-
-            // Disable calibration button when pump is running
-            const extendedBtn = document.getElementById("extendedBtn");
-            if (extendedBtn) {
-              extendedBtn.disabled = data.pump_active;
-            }
-          })
-          .catch((error) => {
-            console.error("Status update failed:", error);
-          });
-      }
-
-      function formatUptime(milliseconds) {
-        const seconds = Math.floor(milliseconds / 1000);
-        const hours = Math.floor(seconds / 3600);
-        const minutes = Math.floor((seconds % 3600) / 60);
-        return hours + "h " + minutes + "m";
-      }
-
-      function logout() {
-        fetch("api/logout", { method: "POST" }).then(() => {
-          window.location.href = "/login";
-        });
-      }
-
-      // ============================================
-      // STATISTICS FUNCTIONS
-      // ============================================
-      function loadStatistics() {
-        fetch("api/get-statistics")
-          .then((response) => response.json())
-          .then((data) => {
-            if (data.success) {
-              document.getElementById("gap1Value").textContent =
-                data.gap1_fail_sum;
-              document.getElementById("gap2Value").textContent =
-                data.gap2_fail_sum;
-              document.getElementById("waterValue").textContent =
-                data.water_fail_sum;
-              document.getElementById("resetTime").textContent =
-                data.last_reset_formatted || "Unknown";
-            } else {
-              document.getElementById("resetTime").textContent =
-                "Error loading";
-            }
-          })
-          .catch((error) => {
-            console.error("Failed to load statistics:", error);
-            document.getElementById("resetTime").textContent =
-              "Connection error";
-          });
-      }
-
-      function resetStatistics() {
-        const confirmMessage =
-          "Are you sure you want to reset error statistics?\n\nThis will set all error counters (Gap1, Gap2, Water) back to zero.\nThis action cannot be undone.";
-
-        if (!confirm(confirmMessage)) {
-          return;
-        }
-
-        const btn = document.getElementById("resetStatsBtn");
-        btn.disabled = true;
-        btn.textContent = "Resetting...";
-
-        fetch("api/reset-statistics", { method: "POST" })
-          .then((response) => response.json())
-          .then((data) => {
-            if (data.success) {
-              showNotification("Statistics reset successfully", "success");
-              loadStatistics();
-            } else {
-              showNotification("Failed to reset statistics", "error");
-            }
-          })
-          .catch((error) => {
-            showNotification("Network error", "error");
-          })
-          .finally(() => {
-            btn.disabled = false;
-            btn.textContent = "Reset Statistics";
-          });
-      }
-
-      function manualLoadStatistics() {
-        const btn = document.getElementById("loadStatsBtn");
-        btn.disabled = true;
-        btn.textContent = "Loading...";
-
+        loadSystemState();
+        loadVolumePerSecond();
         loadStatistics();
+        loadDailyVolume();
 
-        setTimeout(() => {
-          btn.disabled = false;
-          btn.textContent = "Load Statistics";
-        }, 1000);
-      }
-
-      // ============================================
-      // DAILY VOLUME FUNCTIONS
-      // ============================================
-      function loadDailyVolume() {
-        fetch("api/daily-volume")
-          .then((response) => response.json())
-          .then((data) => {
-            if (data.success) {
-              document.getElementById("currentDailyVolume").textContent =
-                data.daily_volume;
-              document.getElementById("maxDailyVolume").textContent =
-                data.max_volume;
-            }
-          })
-          .catch((error) => {
-            console.error("Failed to load daily volume:", error);
-          });
-      }
-
-      function resetDailyVolume() {
-        const confirmMessage =
-          "Are you sure you want to reset Daily Volume to 0ml?\n\nCurrent volume will be cleared.\nThis action cannot be undone.";
-
-        if (!confirm(confirmMessage)) {
-          return;
-        }
-
-        const btn = document.getElementById("resetDailyVolumeBtn");
-        btn.disabled = true;
-        btn.textContent = "Resetting...";
-
-        fetch("api/reset-daily-volume", { method: "POST" })
-          .then((response) => response.json())
-          .then((data) => {
-            if (data.success) {
-              showNotification(
-                "Daily volume reset to 0ml successfully",
-                "success"
-              );
-              loadDailyVolume();
-            } else {
-              const errorMsg = data.error || "Reset failed";
-              showNotification("Failed to reset: " + errorMsg, "error");
-            }
-          })
-          .catch((error) => {
-            showNotification("Network error", "error");
-          })
-          .finally(() => {
-            btn.disabled = false;
-            btn.textContent = "Reset Daily Volume";
-          });
-      }
-
-      // ============================================
-      // INITIALIZATION
-      // ============================================
-      // Status update every 2 seconds
-      setInterval(updateStatus, 2000);
-      updateStatus();
-
-      // Load initial states
-      loadSystemState();
-      loadVolumePerSecond();
-      loadStatistics();
-      loadDailyVolume();
-
-      // Periodic updates
-      setInterval(loadSystemState, 30000);
-      setInterval(loadDailyVolume, 10000);
-
+        setInterval(loadSystemState, 30000);
+        setInterval(loadDailyVolume, 10000);
     </script>
-  </body>
+</body>
 </html>
-
 )rawliteral";
 
 String getLoginHTML() {
