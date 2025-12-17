@@ -236,7 +236,7 @@ const char* DASHBOARD_HTML = R"rawliteral(
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Top Off Water - System</title>
+    <title>Top Off Water</title>
     <style>
         :root {
             --bg-primary: #0a0f1a;
@@ -336,6 +336,7 @@ const char* DASHBOARD_HTML = R"rawliteral(
             color: var(--text-muted);
             font-weight: 500;
         }
+        
 
         .btn-back {
             background: var(--bg-input);
@@ -413,6 +414,14 @@ const char* DASHBOARD_HTML = R"rawliteral(
             font-size: 0.9rem;
             font-weight: 600;
             text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+        }
+
+        .stat-column h3{
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-align: center;
             letter-spacing: 0.05em;
             color: var(--text-secondary);
         }
@@ -654,6 +663,12 @@ const char* DASHBOARD_HTML = R"rawliteral(
         .btn-small {
             padding: 10px 16px;
             font-size: 0.8rem;
+            margin-top: 10px;
+            /* margin-right: 4px; */
+        }
+
+        .btn-small:nth-of-type(2){
+            margin-left: 10px;
         }
 
         /* ===== THIRD CARD: Statistics ===== */
@@ -690,6 +705,24 @@ const char* DASHBOARD_HTML = R"rawliteral(
             gap: 6px;
         }
 
+        .stat-errors {
+            display: flex;
+            flex-direction: row;
+            margin: 3px;
+        }
+
+         .stat-available{
+            display: flex;
+            flex-direction: row;
+            margin: 3px;
+        }
+
+        .stat-daily{
+            display: flex;
+            flex-direction: row;
+            margin: 3px;
+        }
+        
         .stat-line {
             display: flex;
             justify-content: space-between;
@@ -770,6 +803,7 @@ const char* DASHBOARD_HTML = R"rawliteral(
             font-size: 0.75rem;
             font-weight: 500;
             text-transform: uppercase;
+            text-align: center;
             letter-spacing: 0.05em;
             color: var(--text-muted);
         }
@@ -817,7 +851,7 @@ const char* DASHBOARD_HTML = R"rawliteral(
                 <div class="logo-icon">
                     <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
                 </div>
-                <h1>Top Off Water <span>– System</span></h1>
+                <h1>Top Off Water</h1>
             </div>
             <button class="btn-back" onclick="logout()">Back</button>
         </header>
@@ -911,15 +945,55 @@ const char* DASHBOARD_HTML = R"rawliteral(
                 <div class="card-header-icon" style="background: rgba(234, 179, 8, 0.15);">
                     <svg fill="currentColor" style="color: var(--accent-yellow);" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
                 </div>
-                <h2>Statistics</h2>
+                <h2>System Setting</h2>
             </div>
 
  
 
             <div class="stats-columns">
-                <!-- Column 1: Statistics (Load + Reset combined) -->
+                
+                <!-- Column 1: Available Volume -->
                 <div class="stat-column">
-                    <button id="loadStatsBtn" class="btn btn-secondary btn-small" onclick="manualLoadStatistics()">Load Statistics</button>
+                    <h3>Available Water</h3>
+                    <div class="stat-content">
+                        <div class="volume-indicator">
+                            <div class="volume-bar">
+                                <div class="volume-bar-fill" id="availableBarFill"></div>
+                            </div>
+                            <div class="volume-text" id="availableText">0 ml / 10000 ml</div>
+                        </div>
+                    </div>
+                    <div class="input-group" style="margin-top: 8px;">
+                        <input type="number" id="availableVolumeInput" min="100" max="10000" step="100" placeholder="ml">
+                    </div>
+                    <div class="stat-available">
+                        <button class="btn btn-secondary btn-small" onclick="setAvailableVolume()">Set</button>
+                        <button class="btn btn-secondary btn-small" onclick="refillAvailableVolume()">Refill</button>
+                    </div>
+                </div>
+
+                <!-- Column 2: Daily Volume -->
+                <div class="stat-column">
+                    <h3>Daily Refill Limit</h3>
+                    <div class="stat-content">
+                        <div class="volume-indicator">
+                            <div class="volume-bar">
+                                <div class="volume-bar-fill" id="volumeBarFill"></div>
+                            </div>
+                            <div class="volume-text" id="volumeText">0 ml / 2000 ml</div>
+                        </div>
+                    </div>
+                    <div class="input-group" style="margin-top: 8px;">
+                        <input type="number" id="dailyLimitInput" min="100" max="10000" step="100" placeholder="ml">
+                    </div>
+                    <div class="stat-daily">
+                        <button class="btn btn-secondary btn-small" onclick="setDailyLimit()">Set</button>
+                        <button id="resetDailyVolumeBtn" class="btn btn-secondary btn-small" onclick="resetDailyVolume()">Reset</button>
+                    </div>
+                </div>
+                <!-- Column 3: Statistics (Load + Reset combined) -->
+                <div class="stat-column">
+                    <h3>Sensor Errors</h3>
                     <div class="stat-content">
                         <div class="stat-line">
                             <span class="stat-label">Err activate:</span>
@@ -933,47 +1007,17 @@ const char* DASHBOARD_HTML = R"rawliteral(
                             <span class="stat-label">Err pump:</span>
                             <span class="stat-value" id="waterValue">—</span>
                         </div>
+                    <div class="stat-errors">
+                        <button id="loadStatsBtn" class="btn btn-secondary btn-small" onclick="manualLoadStatistics()">Load</button>
+                        <button id="resetStatsBtn" class="btn btn-secondary btn-small" onclick="resetStatistics()">Reset</button>
                     </div>
-                    <button id="resetStatsBtn" class="btn btn-secondary btn-small" onclick="resetStatistics()" style="margin-top: 8px;">Reset Statistics</button>
-                </div>
-
-                <!-- Column 2: Available Volume -->
-                <div class="stat-column">
-                    <div class="stat-content">
-                        <div class="volume-indicator">
-                            <div class="volume-bar">
-                                <div class="volume-bar-fill" id="availableBarFill"></div>
-                            </div>
-                            <div class="volume-text" id="availableText">0 ml / 10000 ml</div>
-                        </div>
+    
                     </div>
-                    <div class="input-group" style="margin-top: 8px;">
-                        <input type="number" id="availableVolumeInput" min="100" max="10000" step="100" placeholder="ml">
-                        <button class="btn btn-secondary btn-small" onclick="setAvailableVolume()">Set Available</button>
-                    </div>
-                    <button class="btn btn-secondary btn-small" onclick="refillAvailableVolume()" style="margin-top: 8px; width: 100%;">Refill Available</button>
-                </div>
-
-                <!-- Column 3: Daily Volume -->
-                <div class="stat-column">
-                    <div class="stat-content">
-                        <div class="volume-indicator">
-                            <div class="volume-bar">
-                                <div class="volume-bar-fill" id="volumeBarFill"></div>
-                            </div>
-                            <div class="volume-text" id="volumeText">0 ml / 2000 ml</div>
-                        </div>
-                    </div>
-                    <div class="input-group" style="margin-top: 8px;">
-                        <input type="number" id="dailyLimitInput" min="100" max="10000" step="100" placeholder="ml">
-                        <button class="btn btn-secondary btn-small" onclick="setDailyLimit()">Set Daily Limit</button>
-                    </div>
-                    <button id="resetDailyVolumeBtn" class="btn btn-secondary btn-small" onclick="resetDailyVolume()" style="margin-top: 8px; width: 100%;">Reset Daily Volume</button>
                 </div>
             </div>
 
-
-
+            
+            
         </div>
 
         <!-- FOURTH CARD: Pump Setting -->
@@ -982,7 +1026,7 @@ const char* DASHBOARD_HTML = R"rawliteral(
                 <div class="card-header-icon" style="background: rgba(249, 115, 22, 0.15);">
                     <svg fill="currentColor" style="color: var(--accent-orange);" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
                 </div>
-                <h2>Pump Setting</h2>
+                <h2>Pump Calibration</h2>
             </div>
 
 
@@ -994,8 +1038,8 @@ const char* DASHBOARD_HTML = R"rawliteral(
 
                 <!-- Element 2: Input z opisem -->
                 <div class="setting-item input-group">
-                    <label for="volumePerSecond">Volume per Second (ml)</label>
-                    <input type="number" id="volumePerSecond" min="0.1" max="50.0" step="0.1" value="1.0">
+                    <label for="volumePerSecond"  style="text-align: center;">Mililiters per Second</label>
+                    <input class="volumePerSecond" type="number" id="volumePerSecond" min="0.1" max="50.0" step="0.1" value="1.0">
                 </div>
 
                 <!-- Element 3: Update Setting + current value -->
@@ -1008,7 +1052,7 @@ const char* DASHBOARD_HTML = R"rawliteral(
 
         <!-- Footer -->
         <div class="footer-info">
-            Top Off Water System • v2.0
+            Top Off Water System • v2.1
         </div>
     </div>
 
