@@ -1033,7 +1033,7 @@ const char* DASHBOARD_HTML = R"rawliteral(
             <div class="settings-row">
                 <!-- Element 1: Pump Calibration button -->
                 <div class="setting-item">
-                    <button id="extendedBtn" class="btn btn-secondary" onclick="triggerExtendedPump()">Pump Calibration (30s)</button>
+                    <button id="extendedBtn" class="btn btn-secondary" onclick="triggerExtendedPump()">Start Calibration (30s)</button>
                 </div>
 
                 <!-- Element 2: Input z opisem -->
@@ -1057,6 +1057,73 @@ const char* DASHBOARD_HTML = R"rawliteral(
     </div>
 
     <script>
+
+        // ============================================
+        // SESSION EXPIRY HANDLING (for VPS proxy)
+        // ============================================
+
+        let sessionExpired = false;
+        let pollingIntervals = [];
+
+        function handleSessionExpired() {
+            if (sessionExpired) return;
+            sessionExpired = true;
+
+            // Stop all polling intervals
+            pollingIntervals.forEach(id => clearInterval(id));
+            pollingIntervals = [];
+            if (pumpCheckInterval) {
+                clearInterval(pumpCheckInterval);
+                pumpCheckInterval = null;
+            }
+
+            // Show overlay
+            const overlay = document.createElement('div');
+            overlay.innerHTML = `
+                <div style="
+                    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+                    background: rgba(0,0,0,0.85); z-index: 9999;
+                    display: flex; justify-content: center; align-items: center;
+                ">
+                    <div style="
+                        background: white; padding: 40px; border-radius: 12px;
+                        text-align: center; max-width: 400px; margin: 20px;
+                    ">
+                        <h2 style="color: #e74c3c; margin-bottom: 15px;">Session Expired</h2>
+                        <p style="color: #666; margin-bottom: 25px;">Your session has expired. Please log in again.</p>
+                        <a href="/login" style="
+                            display: inline-block; padding: 12px 30px;
+                            background: #3498db; color: white;
+                            text-decoration: none; border-radius: 8px;
+                            font-weight: bold;
+                        ">Back to Login</a>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+            console.log("Session expired - polling stopped");
+        }
+
+        async function secureFetch(url, options = {}) {
+            if (sessionExpired) return null;
+
+            try {
+                const response = await fetch(url, options);
+                
+                // Check for auth failure (401 or redirect to login)
+                if (response.status === 401 || 
+                    response.redirected && response.url.includes('/login')) {
+                    handleSessionExpired();
+                    return null;
+                }
+                return response;
+            } catch (error) {
+                console.error('Fetch error:', error);
+                return null;
+            }
+        }
+
+
         // ============================================
         // STATE TRACKING
         // ============================================
@@ -1130,9 +1197,13 @@ const char* DASHBOARD_HTML = R"rawliteral(
         }
 
         function loadSystemState() {
-            fetch("api/system-toggle")
-                .then((response) => response.json())
+            secureFetch("api/system-toggle")
+                .then((response) => {
+                    if (!response) return null;
+                    return response.json();
+                })
                 .then((data) => {
+                    if (!data) return;
                     if (data.success) {
                         systemEnabled = data.enabled;
                         updateSystemToggleButton(data.enabled, data.remaining_seconds);
@@ -1207,9 +1278,13 @@ const char* DASHBOARD_HTML = R"rawliteral(
             if (pumpCheckInterval) clearInterval(pumpCheckInterval);
             
             pumpCheckInterval = setInterval(() => {
-                fetch("api/status")
-                    .then((response) => response.json())
+                secureFetch("api/status")
+                    .then((response) => {
+                        if (!response) return null;
+                        return response.json();
+                    })
                     .then((data) => {
+                        if (!data) return;
                         if (!data.pump_active && manualCycleActive) {
                             manualCycleActive = false;
                             updateManualCycleButton(false);
@@ -1384,9 +1459,14 @@ const char* DASHBOARD_HTML = R"rawliteral(
         // MAIN STATUS UPDATE
         // ============================================
         function updateStatus() {
-            fetch("api/status")
-                .then((response) => response.json())
+            secureFetch("api/status")
+                .then((response) => {
+                    if (!response) return null;
+                    return response.json();
+                })
                 .then((data) => {
+                    if (!data) return;
+                    
                     // Badges
                     updateSensorBadge("sensor1Badge", data.sensor1_active);
                     updateSensorBadge("sensor2Badge", data.sensor2_active);
@@ -1514,9 +1594,13 @@ const char* DASHBOARD_HTML = R"rawliteral(
         // DAILY VOLUME FUNCTIONS
         // ============================================
         function loadDailyVolume() {
-            fetch("api/daily-volume")
-                .then((response) => response.json())
+            secureFetch("api/daily-volume")
+                .then((response) => {
+                    if (!response) return null;
+                    return response.json();
+                })
                 .then((data) => {
+                    if (!data) return;
                     if (data.success) {
                         const current = data.daily_volume;
                         maxDailyVolume = data.max_volume;
@@ -1560,9 +1644,13 @@ const char* DASHBOARD_HTML = R"rawliteral(
         // AVAILABLE VOLUME FUNCTIONS
         // ============================================
         function loadAvailableVolume() {
-            fetch("api/available-volume")
-                .then((response) => response.json())
+            secureFetch("api/available-volume")
+                .then((response) => {
+                    if (!response) return null;
+                    return response.json();
+                })
                 .then((data) => {
+                    if (!data) return;
                     if (data.success) {
                         const current = data.current_ml;
                         const max = data.max_ml;
@@ -1674,18 +1762,20 @@ const char* DASHBOARD_HTML = R"rawliteral(
         // ============================================
         // INITIALIZATION
         // ============================================
-        setInterval(updateStatus, 2000);
-        updateStatus();
 
+        // Register all intervals for cleanup on session expiry
+        pollingIntervals.push(setInterval(updateStatus, 2000));
+        pollingIntervals.push(setInterval(loadSystemState, 30000));
+        pollingIntervals.push(setInterval(loadDailyVolume, 10000));
+        pollingIntervals.push(setInterval(loadAvailableVolume, 10000));
+
+        // Initial loads
+        updateStatus();
         loadSystemState();
         loadVolumePerSecond();
         loadStatistics();
         loadDailyVolume();
         loadAvailableVolume();
-
-        setInterval(loadSystemState, 30000);
-        setInterval(loadDailyVolume, 10000);
-        setInterval(loadAvailableVolume, 10000);
     </script>
 </body>
 </html>
