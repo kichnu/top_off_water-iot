@@ -163,9 +163,12 @@ bool logCycleToVPS(const PumpCycle& cycle, uint32_t unixTime) {
     payload["credentials_source"] = areCredentialsLoaded() ? "FRAM" : "FALLBACK";
     
     String algorithmSummary = "";
-    algorithmSummary += "THRESHOLDS(GAP1:" + String(THRESHOLD_1) + "s,";
-    algorithmSummary += "GAP2:" + String(THRESHOLD_2) + "s,";
-    algorithmSummary += "WATER:" + String(THRESHOLD_WATER) + "s) ";
+    algorithmSummary += "LIMITS(GAP1_MAX:" + String(TIME_GAP_1_MAX) + "s,";
+    algorithmSummary += "GAP2_MAX:" + String(TIME_GAP_2_MAX) + "s,";
+    algorithmSummary += "WATER_MAX:" + String(WATER_TRIGGER_MAX_TIME) + "s) ";
+    // algorithmSummary += "THRESHOLDS(GAP1:" + String(THRESHOLD_1) + "s,";
+    // algorithmSummary += "GAP2:" + String(THRESHOLD_2) + "s,";
+    // algorithmSummary += "WATER:" + String(THRESHOLD_WATER) + "s) ";
     algorithmSummary += "CURRENT(" + String((cycle.sensor_results & PumpCycle::RESULT_GAP1_FAIL) ? 1 : 0) + "-";
     algorithmSummary += String((cycle.sensor_results & PumpCycle::RESULT_GAP2_FAIL) ? 1 : 0) + "-";
     algorithmSummary += String((cycle.sensor_results & PumpCycle::RESULT_WATER_FAIL) ? 1 : 0) + ") ";

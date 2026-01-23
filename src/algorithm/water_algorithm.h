@@ -36,6 +36,10 @@ private:
     bool waitingForSecondSensor;
     uint8_t pumpAttempts;
 
+    uint32_t sensor1DebounceCompleteTime;   // Czas zaliczenia debouncingu czujnika 1
+    uint32_t sensor2DebounceCompleteTime;   // Czas zaliczenia debouncingu czujnika 2
+    bool debouncePhaseActive;               // Czy jesteśmy w fazie debouncingu
+
     // State control flags
     bool cycleLogged;
 
@@ -98,6 +102,12 @@ public:
 
     // Sensor inputs
     void onSensorStateChange(uint8_t sensorNum, bool triggered);
+
+    // ============== NOWE CALLBACKI DEBOUNCINGU ==============
+    void onDebounceProcessStart();                          // Wykryto pierwszy LOW
+    void onSensorDebounceComplete(uint8_t sensorNum);       // Czujnik zaliczył debouncing
+    void onDebounceBothComplete();                          // Oba czujniki zaliczone
+    void onDebounceTimeout(bool sensor1OK, bool sensor2OK); // Timeout TIME_GAP_1_MAX
 
     // Status and data access
     AlgorithmState getState() const { return currentState; }

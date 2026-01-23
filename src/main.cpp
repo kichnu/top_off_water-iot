@@ -190,7 +190,6 @@ void loop() {
     // Update water sensors every loop
     updateWaterSensors();
     waterAlgorithm.update();
-    checkWaterSensors();
     
     // ============== SYSTEM AUTO-ENABLE CHECK ==============
     // Check if 30-minute timeout has elapsed for system re-enable
