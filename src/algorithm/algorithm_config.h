@@ -16,12 +16,16 @@
 
 // ============== PARAMETRY CZASOWE ALGORYTMU ==============
 #define TIME_GAP_1_MAX          2300    // max czas na zaliczenie debouncingu obu czujników (sekundy)
-#define TIME_GAP_2_MAX          30      // max oczekiwanie na drugi czujnik przy podnoszeniu (sekundy)
+#define TIME_GAP_2_MAX          30      // (legacy) max oczekiwanie na drugi czujnik przy podnoszeniu
 #define WATER_TRIGGER_MAX_TIME  240     // max czas na reakcję czujników po starcie pompy (sekundy)
 
-// ============== PARAMETRY DEBOUNCINGU FAZY 1 ==============
+// ============== PARAMETRY DEBOUNCINGU FAZY 1 (opadanie wody) ==============
 #define DEBOUNCE_COUNTER_1      4       // liczba wymaganych pomiarów LOW dla zaliczenia
 #define DEBOUNCE_RATIO          0.6     // współczynnik czasu debouncingu względem TIME_GAP_1_MAX
+
+// ============== PARAMETRY RELEASE VERIFICATION (faza 2 - podnoszenie wody) ==============
+#define RELEASE_CHECK_INTERVAL  2       // sekundy między sprawdzeniami czujników
+#define RELEASE_DEBOUNCE_COUNT  3       // wymagana liczba kolejnych HIGH dla potwierdzenia
 
 // ============== PARAMETRY POMPY ==============
 #define PUMP_MAX_ATTEMPTS       3      // Maksymalna liczba prób pompy w TRYB_2
@@ -47,11 +51,12 @@ static_assert(LOGGING_TIME == 5, "LOGGING_TIME must be 5 seconds");
 // ============== STANY ALGORYTMU ==============
 enum AlgorithmState {
     STATE_IDLE = 0,           // Oczekiwanie na TRIGGER
-    STATE_TRYB_1_WAIT,        // Czekanie na TIME_GAP_1
-    STATE_TRYB_1_DELAY,       // Odliczanie TIME_TO_PUMP
-    STATE_TRYB_2_PUMP,        // Pompa pracuje
-    STATE_TRYB_2_VERIFY,      // Weryfikacja reakcji czujników
-    STATE_TRYB_2_WAIT_GAP2,   // Czekanie na TIME_GAP_2
+    STATE_TRYB_1_WAIT,        // Czekanie na TIME_GAP_1 (debouncing opadania)
+    STATE_TRYB_1_DELAY,       // (legacy - nieużywany)
+    STATE_PUMPING_AND_VERIFY, // Pompa pracuje + monitoring czujników (release verification)
+    STATE_TRYB_2_PUMP,        // (legacy alias dla STATE_PUMPING_AND_VERIFY)
+    STATE_TRYB_2_VERIFY,      // (legacy - nieużywany)
+    STATE_TRYB_2_WAIT_GAP2,   // (legacy - nieużywany)
     STATE_LOGGING,            // Logowanie wyników
     STATE_ERROR,              // Stan błędu
     STATE_MANUAL_OVERRIDE     // Manual pump przerwał cykl
@@ -79,9 +84,11 @@ struct PumpCycle {
     uint16_t  volume_dose;      // Objętość w ml
     
     // Sensor results bit flags
-    static const uint8_t RESULT_GAP1_FAIL = 0x01;  // TIME_GAP_1 >= THRESHOLD_1
-    static const uint8_t RESULT_GAP2_FAIL = 0x02;  // TIME_GAP_2 >= THRESHOLD_2
-    static const uint8_t RESULT_WATER_FAIL = 0x04; // WATER_TRIGGER >= THRESHOLD_WATER
+    static const uint8_t RESULT_GAP1_FAIL = 0x01;           // Faza 1: timeout debounce opadania
+    static const uint8_t RESULT_GAP2_FAIL = 0x02;           // (legacy - nieużywane)
+    static const uint8_t RESULT_WATER_FAIL = 0x04;          // Faza 2: żaden czujnik nie potwierdził
+    static const uint8_t RESULT_SENSOR1_RELEASE_FAIL = 0x08; // Faza 2: S1 nie potwierdził (S2 OK)
+    static const uint8_t RESULT_SENSOR2_RELEASE_FAIL = 0x10; // Faza 2: S2 nie potwierdził (S1 OK)
 };
 
 // ============== FUNKCJE POMOCNICZE ==============

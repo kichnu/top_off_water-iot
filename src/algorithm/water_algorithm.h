@@ -40,6 +40,19 @@ private:
     uint32_t sensor2DebounceCompleteTime;   // Czas zaliczenia debouncingu czujnika 2
     bool debouncePhaseActive;               // Czy jesteśmy w fazie debouncingu
 
+    // ============== KONTEKST Z FAZY 1 (które czujniki wyzwoliły cykl) ==============
+    bool sensor1TriggeredCycle;             // Czy S1 zaliczył debouncing fazy 1
+    bool sensor2TriggeredCycle;             // Czy S2 zaliczył debouncing fazy 1
+
+    // ============== RELEASE DEBOUNCE (faza 2 - podnoszenie wody) ==============
+    struct ReleaseDebounceState {
+        uint8_t counter;                    // Licznik kolejnych HIGH (0-3)
+        bool confirmed;                     // Czy osiągnięto 3×HIGH
+        uint32_t confirmTime;               // Czas potwierdzenia (sekundy)
+    } releaseDebounce[2];
+
+    uint32_t lastReleaseCheck;              // Czas ostatniego sprawdzenia czujników
+
     // State control flags
     bool cycleLogged;
 
@@ -74,6 +87,12 @@ private:
     void calculateTimeGap2();
     void calculateWaterTrigger();
     void logCycleComplete();
+
+    // ============== RELEASE VERIFICATION (faza 2) ==============
+    void resetReleaseDebounce();            // Reset stanu release debounce
+    void updateReleaseDebounce();           // Aktualizacja liczników release
+    void handleReleaseTimeout();            // Obsługa timeout w fazie 2
+    bool checkAllReleaseConfirmed();        // Czy wszystkie wymagane potwierdzone
     uint16_t calculateDailyVolume();
     void startErrorSignal(ErrorCode error);
     void updateErrorSignal();
