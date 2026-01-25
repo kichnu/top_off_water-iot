@@ -58,10 +58,10 @@ void updatePumpController() {
             LOG_INFO("ℹ️ MANUAL_EXTENDED (calibration) - NOT added to daily volume");
         }
 
-        if (!currentActionType.startsWith("AUTO")) {
-            uint32_t unixTime = getUnixTimestamp();
-            logEventToVPS(currentActionType, volumeML, unixTime);
-        }
+        // if (!currentActionType.startsWith("AUTO")) {
+        //     uint32_t unixTime = getUnixTimestamp();
+        //     logEventToVPS(currentActionType, volumeML, unixTime);
+        // }
         currentActionType = "";       
     }
 
@@ -148,11 +148,11 @@ void stopPump() {
             LOG_INFO("MANUAL_EXTENDED (calibration) stopped - NOT added to volume");
         }
         
-        // Log to VPS for non-AUTO actions
-        if (!currentActionType.startsWith("AUTO") && actualDuration > 0) {
-            uint32_t unixTime = getUnixTimestamp();
-            logEventToVPS(currentActionType, volumeML, unixTime);
-        }
+        // // Log to VPS for non-AUTO actions
+        // if (!currentActionType.startsWith("AUTO") && actualDuration > 0) {
+        //     uint32_t unixTime = getUnixTimestamp();
+        //     logEventToVPS(currentActionType, volumeML, unixTime);
+        // }
         
         currentActionType = "";
     }

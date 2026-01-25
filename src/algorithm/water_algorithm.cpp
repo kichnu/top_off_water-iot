@@ -71,16 +71,12 @@ WaterAlgorithm::WaterAlgorithm() {
 }
 
 void WaterAlgorithm::resetCycle() {
-
     currentCycle = {};
     currentCycle.timestamp = getCurrentTimeSeconds();
     triggerStartTime = 0;
     sensor1TriggerTime = 0;
     sensor2TriggerTime = 0;
-    sensor1ReleaseTime = 0;
-    sensor2ReleaseTime = 0;
     pumpStartTime = 0;
-    waitingForSecondSensor = false;
     pumpAttempts = 0;
     cycleLogged = false;
     permission_log = true;
@@ -89,7 +85,7 @@ void WaterAlgorithm::resetCycle() {
     sensor2DebounceCompleteTime = 0;
     debouncePhaseActive = false;
 
-    // ============== RELEASE VERIFICATION RESET ==============
+    // Release verification reset
     sensor1TriggeredCycle = false;
     sensor2TriggeredCycle = false;
     lastReleaseCheck = 0;
@@ -167,8 +163,8 @@ void WaterAlgorithm::handleSystemDisable() {
         saveCycleToStorage(currentCycle);
         
         // Log to VPS
-        uint32_t unixTime = getUnixTimestamp();
-        logEventToVPS("SYSTEM_DISABLED_INTERRUPT", actualVolumeML, unixTime);
+        // uint32_t unixTime = getUnixTimestamp();
+        // logEventToVPS("SYSTEM_DISABLED_INTERRUPT", actualVolumeML, unixTime);
     }
     
     // Reset to IDLE
@@ -209,38 +205,10 @@ void WaterAlgorithm::update() {
         LOG_INFO("Sensor 2: %s", sensor2 ? "ACTIVE" : "inactive");
         
         if (sensor1 || sensor2) {
-            // Sensors active - trigger immediate cycle start
-            LOG_INFO("Sensors active - starting cycle immediately");
+            // Sensors active - let debounce process handle it naturally
+            LOG_INFO("Sensors active - debounce process will start");
             LOG_INFO("====================================");
-            
-            // Simulate sensor trigger to start cycle
-            uint32_t currentTime = getCurrentTimeSeconds();
-            triggerStartTime = currentTime;
-            currentCycle.trigger_time = currentTime;
-            currentCycle.timestamp = currentTime;
-            
-            if (sensor1) {
-                sensor1TriggerTime = currentTime;
-                lastSensor1State = true;
-            }
-            if (sensor2) {
-                sensor2TriggerTime = currentTime;
-                lastSensor2State = true;
-            }
-            
-            // Start TRYB_1 wait
-            currentState = STATE_TRYB_1_WAIT;
-            stateStartTime = currentTime;
-            waitingForSecondSensor = !(sensor1 && sensor2);  // false if both already active
-            
-            // If both sensors already active, calculate TIME_GAP_1 immediately
-            if (sensor1 && sensor2) {
-                currentCycle.time_gap_1 = 0;  // Simultaneous activation
-                LOG_INFO("Both sensors active - TIME_GAP_1 = 0");
-                
-                currentState = STATE_TRYB_1_DELAY;
-                stateStartTime = currentTime;
-            }
+            // checkWaterSensors() w main loop wykryje aktywne czujniki i uruchomi debouncing
         } else {
             LOG_INFO("Sensors inactive - waiting for trigger");
             LOG_INFO("====================================");
@@ -339,27 +307,26 @@ void WaterAlgorithm::update() {
 
     switch (currentState) {
         case STATE_IDLE:
+            // Oczekiwanie na pierwszy LOW - obsługiwane przez water_sensors.cpp
             break;
-        case STATE_TRYB_1_WAIT:
-            // Nowa logika: debouncing jest obsługiwany przez water_sensors.cpp
-            // Ten stan jest teraz tylko "placeholder" - czekamy na callbacki:
-            // - onDebounceBothComplete() -> sukces -> STATE_TRYB_2_PUMP
-            // - onDebounceTimeout() -> timeout -> STATE_TRYB_2_PUMP lub STATE_IDLE
-            // Nic nie robimy tutaj - callbacki obsługują przejścia stanów
+
+        case STATE_PRE_QUALIFICATION:
+            // Pre-qualification - obsługiwane przez water_sensors.cpp
+            // Callbacki: onPreQualificationSuccess() lub onPreQualificationFail()
             break;
-                    
-        case STATE_TRYB_1_DELAY:
-            // Stan usunięty - TIME_TO_PUMP już nie istnieje
-            // Pompa jest uruchamiana bezpośrednio z callbacków debouncingu
-            // Ten case nie powinien być nigdy osiągnięty
-            LOG_ERROR("STATE_TRYB_1_DELAY reached - this should not happen!");
-            currentState = STATE_IDLE;
-            resetCycle();
+
+        case STATE_SETTLING:
+            // Settling (uspokojenie wody) - obsługiwane przez water_sensors.cpp
+            // Callback: onSettlingComplete()
             break;
-               
-        // ============== NOWY POŁĄCZONY STAN: POMPOWANIE + RELEASE VERIFICATION ==============
-        case STATE_PUMPING_AND_VERIFY:
-        case STATE_TRYB_2_PUMP: {
+
+        case STATE_DEBOUNCING:
+            // Debouncing - obsługiwane przez water_sensors.cpp
+            // Callbacki: onDebounceBothComplete() lub onDebounceTimeout()
+            break;
+
+        // ============== FAZA 2: POMPOWANIE + RELEASE VERIFICATION ==============
+        case STATE_PUMPING_AND_VERIFY: {
             // Aktualizuj release debounce (co 2s sprawdzaj czujniki)
             updateReleaseDebounce();
 
@@ -399,20 +366,6 @@ void WaterAlgorithm::update() {
             break;
         }
 
-        // ============== LEGACY STATES (nieużywane, ale zachowane dla kompatybilności) ==============
-        case STATE_TRYB_2_VERIFY:
-            // Przekieruj do nowego stanu
-            LOG_WARNING("Legacy STATE_TRYB_2_VERIFY - redirecting to STATE_PUMPING_AND_VERIFY");
-            currentState = STATE_PUMPING_AND_VERIFY;
-            break;
-
-        case STATE_TRYB_2_WAIT_GAP2:
-            // Przekieruj do nowego stanu
-            LOG_WARNING("Legacy STATE_TRYB_2_WAIT_GAP2 - redirecting to STATE_LOGGING");
-            currentState = STATE_LOGGING;
-            stateStartTime = currentTime;
-            break;
-            
         case STATE_LOGGING:
             if(permission_log){
                 LOG_INFO("==================case STATE_LOGGING");
@@ -517,91 +470,70 @@ void WaterAlgorithm::initDailyVolume() {
     LOG_INFO("====================================");
 }
 
-void WaterAlgorithm::onSensorStateChange(uint8_t sensorNum, bool triggered) {
-    uint32_t currentTime = getCurrentTimeSeconds(); // <-- ZMIANA: sekundy zamiast millis()
-    
-    // ============== BLOCK SENSOR EVENTS WHEN SYSTEM DISABLED ==============
-    if (isSystemDisabled()) {
-        // Ignore sensor changes when system is disabled
-        return;
-    }
-    
-    // Update sensor states
-    if (sensorNum == 1) {
-        lastSensor1State = triggered;
-        if (triggered) {
-            sensor1TriggerTime = currentTime;
-        } else {
-            sensor1ReleaseTime = currentTime;
-        }
-    } else if (sensorNum == 2) {
-        lastSensor2State = triggered;
-        if (triggered) {
-            sensor2TriggerTime = currentTime;
-        } else {
-            sensor2ReleaseTime = currentTime;
-        }
-    }
-    
-    // Handle state transitions based on sensor changes
-    switch (currentState) {
-        case STATE_IDLE:
-            if (triggered && (lastSensor1State || lastSensor2State)) {
-                // TRIGGER detected!
-                LOG_INFO("TRIGGER detected! Starting TRYB_1");
-                triggerStartTime = currentTime;
-                currentCycle.trigger_time = currentTime;
-                currentState = STATE_TRYB_1_WAIT;
-                stateStartTime = currentTime;
-                waitingForSecondSensor = true;
-            }
-            break;
-            
-        case STATE_TRYB_1_WAIT:
-            // Nowa logika: debouncing jest obsługiwany przez water_sensors.cpp
-            // Ta funkcja onSensorStateChange() nie jest już wywoływana dla TRYB_1
-            // Zostawiamy pusty case dla kompatybilności
-            break;
-            
-        case STATE_TRYB_2_WAIT_GAP2:
-            if (!triggered && waitingForSecondSensor && 
-                sensor1ReleaseTime && sensor2ReleaseTime) {
-                // Both sensors released, calculate TIME_GAP_2
-                calculateTimeGap2();
-                waitingForSecondSensor = false;
-                LOG_INFO("TRYB_2: TIME_GAP_2=%dms", currentCycle.time_gap_2);
-            }
-            break;
-            
-        default:
-            // Ignore sensor changes in other states
-            break;
-    }
-}
+// ============== CALLBACKI FAZY 1 (Pre-qual + Settling + Debouncing) ==============
 
-// ============== NOWE CALLBACKI DEBOUNCINGU ==============
+void WaterAlgorithm::onPreQualificationStart() {
+    LOG_INFO("====================================");
+    LOG_INFO("ALGORITHM: Pre-qualification started");
+    LOG_INFO("====================================");
 
-void WaterAlgorithm::onDebounceProcessStart() {
-    LOG_INFO("====================================");
-    LOG_INFO("ALGORITHM: Debounce process started");
-    LOG_INFO("====================================");
-    
-    // Reset czasów zaliczenia
-    sensor1DebounceCompleteTime = 0;
-    sensor2DebounceCompleteTime = 0;
-    debouncePhaseActive = true;
-    
-    // Rozpocznij cykl - przejdź do stanu oczekiwania
+    // Rozpocznij cykl - przejdź do stanu PRE_QUALIFICATION
     if (currentState == STATE_IDLE) {
         uint32_t currentTime = getCurrentTimeSeconds();
         triggerStartTime = currentTime;
         currentCycle.trigger_time = currentTime;
         currentCycle.timestamp = currentTime;
-        currentState = STATE_TRYB_1_WAIT;
+        currentState = STATE_PRE_QUALIFICATION;
         stateStartTime = currentTime;
-        
-        LOG_INFO("State changed: IDLE -> TRYB_1_WAIT");
+
+        // Reset czasów zaliczenia
+        sensor1DebounceCompleteTime = 0;
+        sensor2DebounceCompleteTime = 0;
+        debouncePhaseActive = false;
+
+        LOG_INFO("State changed: IDLE -> PRE_QUALIFICATION");
     }
+}
+
+void WaterAlgorithm::onPreQualificationSuccess() {
+    LOG_INFO("====================================");
+    LOG_INFO("ALGORITHM: Pre-qualification SUCCESS");
+    LOG_INFO("====================================");
+
+    uint32_t currentTime = getCurrentTimeSeconds();
+    currentState = STATE_SETTLING;
+    stateStartTime = currentTime;
+
+    LOG_INFO("State changed: PRE_QUALIFICATION -> SETTLING (%ds)", SETTLING_TIME);
+}
+
+void WaterAlgorithm::onPreQualificationFail() {
+    LOG_INFO("====================================");
+    LOG_INFO("ALGORITHM: Pre-qualification FAIL (silent reset)");
+    LOG_INFO("====================================");
+
+    // Cichy powrót do IDLE - bez błędu
+    currentState = STATE_IDLE;
+    resetCycle();
+
+    LOG_INFO("State changed: PRE_QUALIFICATION -> IDLE (no error)");
+}
+
+void WaterAlgorithm::onSettlingComplete() {
+    LOG_INFO("====================================");
+    LOG_INFO("ALGORITHM: Settling complete");
+    LOG_INFO("====================================");
+
+    uint32_t currentTime = getCurrentTimeSeconds();
+    currentState = STATE_DEBOUNCING;
+    stateStartTime = currentTime;
+    debouncePhaseActive = true;
+
+    // Reset czasów zaliczenia dla fazy debouncing
+    sensor1DebounceCompleteTime = 0;
+    sensor2DebounceCompleteTime = 0;
+
+    LOG_INFO("State changed: SETTLING -> DEBOUNCING (%ds timeout)", TOTAL_DEBOUNCE_TIME);
 }
 
 void WaterAlgorithm::onSensorDebounceComplete(uint8_t sensorNum) {
@@ -716,26 +648,25 @@ void WaterAlgorithm::onDebounceTimeout(bool sensor1OK, bool sensor2OK) {
         LOG_INFO("Pump started for %d seconds (with GAP1_FAIL)", pumpWorkTime);
 
     } else {
-        // Żaden czujnik nie zaliczył - reset do IDLE
-        LOG_ERROR("No sensor passed debounce - returning to IDLE");
+        // Żaden czujnik nie zaliczył - ERR_FALSE_TRIGGER
+        LOG_ERROR("====================================");
+        LOG_ERROR("ERR_FALSE_TRIGGER: No sensor passed debounce");
+        LOG_ERROR("====================================");
+        LOG_ERROR("Pre-qualification passed, but debounce failed for both sensors");
+        LOG_ERROR("Possible causes: snail, temporary blockage, sensor noise");
+
+        // Ustaw flagę błędu FALSE_TRIGGER
+        currentCycle.sensor_results |= PumpCycle::RESULT_FALSE_TRIGGER;
+
+        // Loguj cykl z błędem
+        currentCycle.time_gap_1 = TOTAL_DEBOUNCE_TIME;
+        currentCycle.error_code = ERROR_NONE;  // Nie jest to krytyczny błąd
+        logCycleComplete();
 
         currentState = STATE_IDLE;
         resetCycle();
-    }
-}
 
-void WaterAlgorithm::calculateTimeGap1() {
-    // Nowa logika: ta funkcja jest teraz używana tylko do obliczeń
-    // Flaga RESULT_GAP1_FAIL jest ustawiana przez callbacki debouncingu
-    if (sensor1TriggerTime && sensor2TriggerTime) {
-        currentCycle.time_gap_1 = abs((int32_t)sensor2TriggerTime - 
-                                      (int32_t)sensor1TriggerTime);
-        
-        LOG_INFO("TIME_GAP_1: %ds (max: %ds)", 
-                currentCycle.time_gap_1, TIME_GAP_1_MAX);
-    } else {
-        LOG_WARNING("TIME_GAP_1 not calculated: s1Time=%ds, s2Time=%ds", 
-                   sensor1TriggerTime, sensor2TriggerTime);
+        LOG_INFO("Returned to IDLE with FALSE_TRIGGER flag");
     }
 }
 
@@ -1032,11 +963,11 @@ void WaterAlgorithm::logCycleComplete() {
 
     uint32_t unixTime = getUnixTimestamp();
     
-    if (logCycleToVPS(currentCycle, unixTime)) {
-        LOG_INFO("Cycle data sent to VPS successfully");
-    } else {
-        LOG_WARNING("Failed to send cycle data to VPS");
-    }
+    // if (logCycleToVPS(currentCycle, unixTime)) {
+    //     LOG_INFO("Cycle data sent to VPS successfully");
+    // } else {
+    //     LOG_WARNING("Failed to send cycle data to VPS");
+    // }
     
     LOG_INFO("=== CYCLE COMPLETE ===");
     LOG_INFO("Actual volume: %dml (pump_duration: %ds)", actualVolumeML, currentCycle.pump_duration);
@@ -1068,11 +999,8 @@ bool WaterAlgorithm::requestManualPump(uint16_t duration_ms) {
     
     // SPRAWDŹ czy to AUTO_PUMP podczas automatycznego cyklu
     if (currentState != STATE_IDLE) {
-        // Jeśli jesteśmy w automatycznym cyklu, nie resetuj danych!
-        if (currentState == STATE_TRYB_1_DELAY || 
-            currentState == STATE_TRYB_2_PUMP ||
-            currentState == STATE_TRYB_2_VERIFY) {
-            
+        // Jeśli jesteśmy w fazie pompowania, nie resetuj danych!
+        if (currentState == STATE_PUMPING_AND_VERIFY) {
             LOG_INFO("AUTO_PUMP during automatic cycle - preserving cycle data");
             // NIE wywołuj resetCycle() - zachowaj zebrane dane!
             return true; // Pozwól na pompę, ale nie resetuj
@@ -1098,12 +1026,10 @@ void WaterAlgorithm::onManualPumpComplete() {
 const char* WaterAlgorithm::getStateString() const {
     switch (currentState) {
         case STATE_IDLE: return "IDLE";
-        case STATE_TRYB_1_WAIT: return "DEBOUNCE_DRAIN";
-        case STATE_TRYB_1_DELAY: return "TRYB_1_DELAY";
+        case STATE_PRE_QUALIFICATION: return "PRE_QUAL";
+        case STATE_SETTLING: return "SETTLING";
+        case STATE_DEBOUNCING: return "DEBOUNCING";
         case STATE_PUMPING_AND_VERIFY: return "PUMP+VERIFY";
-        case STATE_TRYB_2_PUMP: return "PUMP+VERIFY";
-        case STATE_TRYB_2_VERIFY: return "TRYB_2_VERIFY";
-        case STATE_TRYB_2_WAIT_GAP2: return "TRYB_2_WAIT_GAP2";
         case STATE_LOGGING: return "LOGGING";
         case STATE_ERROR: return "ERROR";
         case STATE_MANUAL_OVERRIDE: return "MANUAL_OVERRIDE";
@@ -1238,15 +1164,15 @@ bool WaterAlgorithm::resetErrorStatistics() {
         LOG_INFO("Error statistics reset requested via web interface");
         
         // ✅ PRZYWRÓĆ VPS logging z short timeout (3 seconds max)
-        uint32_t unixTime = getUnixTimestamp();
-        String timestamp = getCurrentTimestamp();
-        bool vpsSuccess = logEventToVPS("STATISTICS_RESET", 0, unixTime);
+        // uint32_t unixTime = getUnixTimestamp();
+        // String timestamp = getCurrentTimestamp();
+        // bool vpsSuccess = logEventToVPS("STATISTICS_RESET", 0, unixTime);
         
-        if (vpsSuccess) {
-            LOG_INFO("✅ Statistics reset + VPS logging: SUCCESS");
-        } else {
-            LOG_WARNING("⚠️ Statistics reset: SUCCESS, VPS logging: FAILED (non-critical)");
-        }
+        // if (vpsSuccess) {
+        //     LOG_INFO("✅ Statistics reset + VPS logging: SUCCESS");
+        // } else {
+        //     LOG_WARNING("⚠️ Statistics reset: SUCCESS, VPS logging: FAILED (non-critical)");
+        // }
     }
     return success;
 }
@@ -1268,32 +1194,6 @@ bool WaterAlgorithm::getErrorStatistics(uint16_t& gap1_sum, uint16_t& gap2_sum, 
     
     return success;
 }
-
-// void WaterAlgorithm::addManualVolume(uint16_t volumeML) {
-//     // 🆕 NEW: Add manual pump volume to daily total
-//     dailyVolumeML += volumeML;
-    
-//     // Save to FRAM
-//     if (!saveDailyVolumeToFRAM(dailyVolumeML, lastResetUTCDay)) {
-//         LOG_WARNING("⚠️ Failed to save daily volume to FRAM after manual pump");
-//     }
-    
-//     LOG_INFO("✅ Manual volume added: +%dml → Total: %dml / %dml", 
-//              volumeML, dailyVolumeML, FILL_WATER_MAX);
-    
-//     // 🆕 NEW: Check if limit exceeded after manual pump
-//     if (dailyVolumeML >= FILL_WATER_MAX) {
-//         LOG_ERROR("❌ Daily limit reached after manual pump: %dml / %dml", 
-//                   dailyVolumeML, FILL_WATER_MAX);
-        
-//         // Trigger error state
-//         currentCycle.error_code = ERROR_DAILY_LIMIT;
-//         startErrorSignal(ERROR_DAILY_LIMIT);
-//         currentState = STATE_ERROR;
-        
-//         LOG_ERROR("System entering ERROR state - press reset button to clear");
-//     }
-// }
 
 void WaterAlgorithm::addManualVolume(uint16_t volumeML) {
     // 🆕 MODIFIED: Manual pump decreases ONLY available volume, NOT daily volume
@@ -1475,14 +1375,14 @@ bool WaterAlgorithm::resetDailyVolume() {
     LOG_INFO("====================================");
     
     // Log to VPS
-    uint32_t unixTime = getUnixTimestamp();
-    bool vpsSuccess = logEventToVPS("STATISTICS_RESET", 0, unixTime);
+    // uint32_t unixTime = getUnixTimestamp();
+    // bool vpsSuccess = logEventToVPS("STATISTICS_RESET", 0, unixTime);
     
-    if (vpsSuccess) {
-        LOG_INFO("✅ Volume reset + VPS logging: SUCCESS");
-    } else {
-        LOG_WARNING("⚠️ Volume reset: SUCCESS, VPS logging: FAILED (non-critical)");
-    }
+    // if (vpsSuccess) {
+    //     LOG_INFO("✅ Volume reset + VPS logging: SUCCESS");
+    // } else {
+    //     LOG_WARNING("⚠️ Volume reset: SUCCESS, VPS logging: FAILED (non-critical)");
+    // }
     
     return true;
 }
@@ -1514,30 +1414,26 @@ String WaterAlgorithm::getStateDescription() const {
     switch (currentState) {
         case STATE_IDLE:
             return "IDLE - Waiting for sensors";
-            
-        case STATE_TRYB_1_WAIT:
-            return "Analyzing drain pattern...";
-            
-        case STATE_TRYB_1_DELAY:
-            return "Waiting before pump activation";
+
+        case STATE_PRE_QUALIFICATION:
+            return "Pre-qualification (quick test)";
+
+        case STATE_SETTLING:
+            return "Settling - water calming down";
+
+        case STATE_DEBOUNCING:
+            return "Debouncing - verifying drain";
 
         case STATE_PUMPING_AND_VERIFY:
-        case STATE_TRYB_2_PUMP:
             if (isPumpActive()) {
                 return "Pump operating + monitoring sensors";
             } else {
                 return "Verifying sensor response";
             }
 
-        case STATE_TRYB_2_VERIFY:
-            return "Verifying sensor response";
-
-        case STATE_TRYB_2_WAIT_GAP2:
-            return "Measuring recovery time";
-            
         case STATE_LOGGING:
             return "Logging cycle data";
-            
+
         case STATE_ERROR:
             // Detailed error message
             switch (lastError) {
@@ -1581,21 +1477,32 @@ uint32_t WaterAlgorithm::getRemainingSeconds() const {
         case STATE_MANUAL_OVERRIDE:
             // No countdown for these states
             return 0;
-            
-        case STATE_TRYB_1_WAIT:
-            // Waiting for second sensor (TIME_GAP_1_MAX)
+
+        case STATE_PRE_QUALIFICATION:
+            // Pre-qualification timeout
             elapsed = currentTime - stateStartTime;
-            if (elapsed >= TIME_GAP_1_MAX) {
+            if (elapsed >= PRE_QUAL_WINDOW) {
                 return 0;
             }
-            return TIME_GAP_1_MAX - elapsed;
-            
-        case STATE_TRYB_1_DELAY:
-            // Stan usunięty - nie powinien być osiągnięty
-            return 0;
-            
+            return PRE_QUAL_WINDOW - elapsed;
+
+        case STATE_SETTLING:
+            // Settling countdown
+            elapsed = currentTime - stateStartTime;
+            if (elapsed >= SETTLING_TIME) {
+                return 0;
+            }
+            return SETTLING_TIME - elapsed;
+
+        case STATE_DEBOUNCING:
+            // Debouncing timeout
+            elapsed = currentTime - stateStartTime;
+            if (elapsed >= TOTAL_DEBOUNCE_TIME) {
+                return 0;
+            }
+            return TOTAL_DEBOUNCE_TIME - elapsed;
+
         case STATE_PUMPING_AND_VERIFY:
-        case STATE_TRYB_2_PUMP:
             // Pump + verify - return time until timeout (WATER_TRIGGER_MAX_TIME)
             elapsed = currentTime - pumpStartTime;
             if (elapsed >= WATER_TRIGGER_MAX_TIME) {
@@ -1603,18 +1510,6 @@ uint32_t WaterAlgorithm::getRemainingSeconds() const {
             }
             return WATER_TRIGGER_MAX_TIME - elapsed;
 
-        case STATE_TRYB_2_VERIFY:
-            // Legacy - waiting for sensors to respond
-            elapsed = currentTime - pumpStartTime;
-            if (elapsed >= WATER_TRIGGER_MAX_TIME) {
-                return 0;
-            }
-            return WATER_TRIGGER_MAX_TIME - elapsed;
-
-        case STATE_TRYB_2_WAIT_GAP2:
-            // Legacy - TIME_GAP_2 measurement
-            return 0;
-            
         default:
             return 0;
     }

@@ -17,10 +17,7 @@ private:
     uint32_t triggerStartTime;
     uint32_t sensor1TriggerTime;
     uint32_t sensor2TriggerTime;
-    uint32_t sensor1ReleaseTime;
-    uint32_t sensor2ReleaseTime;
     uint32_t pumpStartTime;
-    uint32_t lastPumpTime;
     bool permission_log;
 
     bool waterFailDetected = false;
@@ -33,7 +30,6 @@ private:
     // Sensor states
     bool lastSensor1State;
     bool lastSensor2State;
-    bool waitingForSecondSensor;
     uint8_t pumpAttempts;
 
     uint32_t sensor1DebounceCompleteTime;   // Czas zaliczenia debouncingu czujnika 1
@@ -83,17 +79,16 @@ private:
 
     // Private methods
     void resetCycle();
-    void calculateTimeGap1();
     void calculateTimeGap2();
     void calculateWaterTrigger();
     void logCycleComplete();
 
     // ============== RELEASE VERIFICATION (faza 2) ==============
-    void resetReleaseDebounce();            // Reset stanu release debounce
-    void updateReleaseDebounce();           // Aktualizacja liczników release
-    void handleReleaseTimeout();            // Obsługa timeout w fazie 2
-    bool checkAllReleaseConfirmed();        // Czy wszystkie wymagane potwierdzone
-    uint16_t calculateDailyVolume();
+    void resetReleaseDebounce();
+    void updateReleaseDebounce();
+    void handleReleaseTimeout();
+    bool checkAllReleaseConfirmed();
+
     void startErrorSignal(ErrorCode error);
     void updateErrorSignal();
     void checkResetButton();
@@ -119,14 +114,14 @@ public:
     // Main algorithm update - call this from loop()
     void update();
 
-    // Sensor inputs
-    void onSensorStateChange(uint8_t sensorNum, bool triggered);
-
-    // ============== NOWE CALLBACKI DEBOUNCINGU ==============
-    void onDebounceProcessStart();                          // Wykryto pierwszy LOW
+    // ============== CALLBACKI FAZY 1 (Pre-qual + Settling + Debouncing) ==============
+    void onPreQualificationStart();                         // Wykryto pierwszy LOW, start pre-qual
+    void onPreQualificationSuccess();                       // Pre-qual zaliczone (3×LOW)
+    void onPreQualificationFail();                          // Pre-qual timeout (cichy reset)
+    void onSettlingComplete();                              // Settling zakończone, start debouncing
     void onSensorDebounceComplete(uint8_t sensorNum);       // Czujnik zaliczył debouncing
     void onDebounceBothComplete();                          // Oba czujniki zaliczone
-    void onDebounceTimeout(bool sensor1OK, bool sensor2OK); // Timeout TIME_GAP_1_MAX
+    void onDebounceTimeout(bool sensor1OK, bool sensor2OK); // Timeout TOTAL_DEBOUNCE_TIME
 
     // Status and data access
     AlgorithmState getState() const { return currentState; }

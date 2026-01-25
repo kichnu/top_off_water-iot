@@ -137,7 +137,7 @@ void setup() {
     initRateLimiter();
     
     // Initialize VPS logger
-    initVPSLogger();
+    // initVPSLogger();
     
     // Initialize web server
     initWebServer();
