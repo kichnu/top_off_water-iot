@@ -89,7 +89,7 @@ const IPAddress TRUSTED_VPS_IP(10, 99, 0, 1);
 
 bool isTrustedProxyIP(IPAddress ip) {
     if (ip == TRUSTED_VPS_IP) {
-        LOG_INFO("🔓 Trusted VPS proxy IP: %s", ip.toString().c_str());
+        // LOG_INFO("🔓 Trusted VPS proxy IP: %s", ip.toString().c_str());
         return true;
     }
     return false;

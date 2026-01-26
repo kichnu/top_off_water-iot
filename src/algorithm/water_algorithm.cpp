@@ -496,6 +496,13 @@ void WaterAlgorithm::onPreQualificationStart() {
 }
 
 void WaterAlgorithm::onPreQualificationSuccess() {
+    // Safety check - only proceed if in expected state
+    if (currentState != STATE_PRE_QUALIFICATION) {
+        LOG_WARNING("onPreQualificationSuccess ignored - state is %s, not PRE_QUALIFICATION",
+                    getStateString());
+        return;
+    }
+
     LOG_INFO("====================================");
     LOG_INFO("ALGORITHM: Pre-qualification SUCCESS");
     LOG_INFO("====================================");
@@ -508,6 +515,13 @@ void WaterAlgorithm::onPreQualificationSuccess() {
 }
 
 void WaterAlgorithm::onPreQualificationFail() {
+    // Safety check - only proceed if in expected state
+    if (currentState != STATE_PRE_QUALIFICATION) {
+        LOG_WARNING("onPreQualificationFail ignored - state is %s, not PRE_QUALIFICATION",
+                    getStateString());
+        return;
+    }
+
     LOG_INFO("====================================");
     LOG_INFO("ALGORITHM: Pre-qualification FAIL (silent reset)");
     LOG_INFO("====================================");
@@ -520,6 +534,13 @@ void WaterAlgorithm::onPreQualificationFail() {
 }
 
 void WaterAlgorithm::onSettlingComplete() {
+    // Safety check - only proceed if in expected state
+    if (currentState != STATE_SETTLING) {
+        LOG_WARNING("onSettlingComplete ignored - state is %s, not SETTLING",
+                    getStateString());
+        return;
+    }
+
     LOG_INFO("====================================");
     LOG_INFO("ALGORITHM: Settling complete");
     LOG_INFO("====================================");
@@ -549,6 +570,13 @@ void WaterAlgorithm::onSensorDebounceComplete(uint8_t sensorNum) {
 }
 
 void WaterAlgorithm::onDebounceBothComplete() {
+    // Safety check - only proceed if in expected state
+    if (currentState != STATE_DEBOUNCING) {
+        LOG_WARNING("onDebounceBothComplete ignored - state is %s, not DEBOUNCING",
+                    getStateString());
+        return;
+    }
+
     LOG_INFO("====================================");
     LOG_INFO("ALGORITHM: Both sensors debounce OK");
     LOG_INFO("====================================");
@@ -596,6 +624,13 @@ void WaterAlgorithm::onDebounceBothComplete() {
 }
 
 void WaterAlgorithm::onDebounceTimeout(bool sensor1OK, bool sensor2OK) {
+    // Safety check - only proceed if in expected state
+    if (currentState != STATE_DEBOUNCING) {
+        LOG_WARNING("onDebounceTimeout ignored - state is %s, not DEBOUNCING",
+                    getStateString());
+        return;
+    }
+
     LOG_INFO("====================================");
     LOG_INFO("ALGORITHM: Debounce timeout");
     LOG_INFO("====================================");

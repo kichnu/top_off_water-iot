@@ -87,6 +87,17 @@ void resetSensorProcess() {
 
 // ============== GŁÓWNA LOGIKA ==============
 void checkWaterSensors() {
+    // ============== SKIP SENSOR PROCESSING IN CERTAIN ALGORITHM STATES ==============
+    // - STATE_PUMPING_AND_VERIFY: Algorithm handles release debounce internally
+    // - STATE_LOGGING: Avoid false triggers right after cycle
+    // - STATE_ERROR: Don't start new cycles while in error state
+    AlgorithmState algState = waterAlgorithm.getState();
+    if (algState == STATE_PUMPING_AND_VERIFY ||
+        algState == STATE_LOGGING ||
+        algState == STATE_ERROR) {
+        return;  // Don't process sensors in these states
+    }
+
     uint32_t currentTime = millis() / 1000;
     bool sensor1Low = readWaterSensor1();
     bool sensor2Low = readWaterSensor2();
@@ -121,8 +132,8 @@ void checkWaterSensors() {
         case PHASE_PRE_QUALIFICATION: {
             uint32_t elapsed = currentTime - phaseStartTime;
 
-            // Sprawdź timeout
-            if (elapsed >= PRE_QUAL_WINDOW) {
+            // Sprawdź timeout (> nie >= żeby pomiar na granicy timeout mógł się wykonać)
+            if (elapsed > PRE_QUAL_WINDOW) {
                 LOG_INFO("====================================");
                 LOG_INFO("PRE_QUAL TIMEOUT - returning to IDLE");
                 LOG_INFO("====================================");
@@ -201,8 +212,8 @@ void checkWaterSensors() {
         case PHASE_DEBOUNCING: {
             uint32_t elapsed = currentTime - phaseStartTime;
 
-            // Sprawdź timeout
-            if (elapsed >= TOTAL_DEBOUNCE_TIME) {
+            // Sprawdź timeout (> nie >= żeby pomiar na granicy timeout mógł się wykonać)
+            if (elapsed > TOTAL_DEBOUNCE_TIME) {
                 LOG_INFO("====================================");
                 LOG_INFO("DEBOUNCE TIMEOUT (%ds)", TOTAL_DEBOUNCE_TIME);
                 LOG_INFO("====================================");
