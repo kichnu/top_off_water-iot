@@ -48,21 +48,13 @@ WaterAlgorithm::WaterAlgorithm() {
     }
 
     framDataLoaded = false;
-    lastFRAMCleanup = millis();
     framCycles.clear();
-    
+
     // ============== SYSTEM DISABLE FLAG INIT ==============
     systemWasDisabled = false;
-    
-    loadCyclesFromStorage();
 
-    ErrorStats stats;
-    if (loadErrorStatsFromFRAM(stats)) {
-        LOG_INFO("Error statistics loaded from FRAM");
-    } else {
-        LOG_WARNING("Could not load error stats from FRAM");
-    }
-    
+    // NOTE: FRAM data loaded later via initFromFRAM() — called from setup() after initNVS()
+
     pinMode(ERROR_SIGNAL_PIN, OUTPUT);
     digitalWrite(ERROR_SIGNAL_PIN, LOW);
     pinMode(RESET_PIN, INPUT_PULLUP);
@@ -72,7 +64,7 @@ WaterAlgorithm::WaterAlgorithm() {
 
 void WaterAlgorithm::resetCycle() {
     currentCycle = {};
-    currentCycle.timestamp = getCurrentTimeSeconds();
+    currentCycle.timestamp = getUnixTimestamp();
     triggerStartTime = 0;
     sensor1TriggerTime = 0;
     sensor2TriggerTime = 0;
@@ -153,18 +145,16 @@ void WaterAlgorithm::handleSystemDisable() {
         currentCycle.volume_dose = actualVolumeML;
         
         // Add to daily volume
+        framBusy = true;
         if (actualVolumeML > 0) {
             dailyVolumeML += actualVolumeML;
             saveDailyVolumeToFRAM(dailyVolumeML, lastResetUTCDay);
             LOG_INFO("Partial volume added: %dml, daily total: %dml", actualVolumeML, dailyVolumeML);
         }
-        
+
         // Save to FRAM
         saveCycleToStorage(currentCycle);
-        
-        // Log to VPS
-        // uint32_t unixTime = getUnixTimestamp();
-        // logEventToVPS("SYSTEM_DISABLED_INTERRUPT", actualVolumeML, unixTime);
+        framBusy = false;
     }
     
     // Reset to IDLE
@@ -395,6 +385,18 @@ void WaterAlgorithm::update() {
 }
    
 
+void WaterAlgorithm::initFromFRAM() {
+    LOG_INFO("Loading cycle history and error stats from FRAM...");
+    loadCyclesFromStorage();
+
+    ErrorStats stats;
+    if (loadErrorStatsFromFRAM(stats)) {
+        LOG_INFO("Error statistics loaded from FRAM");
+    } else {
+        LOG_WARNING("Could not load error stats from FRAM");
+    }
+}
+
 void WaterAlgorithm::initDailyVolume() {
     LOG_INFO("====================================");
     LOG_INFO("INITIALIZING DAILY VOLUME");
@@ -482,7 +484,7 @@ void WaterAlgorithm::onPreQualificationStart() {
         uint32_t currentTime = getCurrentTimeSeconds();
         triggerStartTime = currentTime;
         currentCycle.trigger_time = currentTime;
-        currentCycle.timestamp = currentTime;
+        currentCycle.timestamp = getUnixTimestamp();
         currentState = STATE_PRE_QUALIFICATION;
         stateStartTime = currentTime;
 
@@ -653,8 +655,14 @@ void WaterAlgorithm::onDebounceTimeout(bool sensor1OK, bool sensor2OK) {
             currentCycle.time_gap_1 = TIME_GAP_1_MAX;  // Timeout value
         }
 
-        // Ustaw flagę błędu
+        // Ustaw flagi bledu
         currentCycle.sensor_results |= PumpCycle::RESULT_GAP1_FAIL;
+        if (!sensor1OK) {
+            currentCycle.sensor_results |= PumpCycle::RESULT_SENSOR1_DEBOUNCE_FAIL;
+        }
+        if (!sensor2OK) {
+            currentCycle.sensor_results |= PumpCycle::RESULT_SENSOR2_DEBOUNCE_FAIL;
+        }
 
         // ============== USTAW KONTEKST DLA FAZY 2 ==============
         // Tylko te czujniki które zaliczyły będą wymagane w release verification
@@ -956,44 +964,50 @@ void WaterAlgorithm::logCycleComplete() {
     // Add to daily volume (use actual volume, not fixed SINGLE_DOSE_VOLUME)
     dailyVolumeML += actualVolumeML;
 
+    // --- FRAM write section (block HTTP reads during writes) ---
+    framBusy = true;
+
     if (!saveDailyVolumeToFRAM(dailyVolumeML, lastResetUTCDay)) {
-        LOG_WARNING("⚠️ Failed to save daily volume to FRAM");
+        LOG_WARNING("Failed to save daily volume to FRAM");
     }
 
-        if (availableVolumeCurrent >= actualVolumeML) {
+    if (availableVolumeCurrent >= actualVolumeML) {
         availableVolumeCurrent -= actualVolumeML;
     } else {
         availableVolumeCurrent = 0;
     }
-    
+
     if (!saveAvailableVolumeToFRAM(availableVolumeMax, availableVolumeCurrent)) {
         LOG_WARNING("Failed to save available volume to FRAM");
     }
-    
+
     // Store in today's cycles (RAM)
     todayCycles.push_back(currentCycle);
-    
-    // Keep only last 50 cycles in RAM (FRAM will store more)
+
+    // Keep only last 50 cycles in RAM
     if (todayCycles.size() > 50) {
         todayCycles.erase(todayCycles.begin());
     }
-    
+
     // Save cycle to FRAM (for debugging and history)
     saveCycleToStorage(currentCycle);
-    
+
     // *** Update error statistics in FRAM ***
     uint8_t gap1_increment = (currentCycle.sensor_results & PumpCycle::RESULT_GAP1_FAIL) ? 1 : 0;
     uint8_t gap2_increment = (currentCycle.sensor_results & PumpCycle::RESULT_GAP2_FAIL) ? 1 : 0;
     uint8_t water_increment = (currentCycle.sensor_results & PumpCycle::RESULT_WATER_FAIL) ? 1 : 0;
-    
+
     if (gap1_increment || gap2_increment || water_increment) {
         if (incrementErrorStats(gap1_increment, gap2_increment, water_increment)) {
-            LOG_INFO("Error stats updated: GAP1+%d, GAP2+%d, WATER+%d", 
+            LOG_INFO("Error stats updated: GAP1+%d, GAP2+%d, WATER+%d",
                     gap1_increment, gap2_increment, water_increment);
         } else {
             LOG_WARNING("Failed to update error stats in FRAM");
         }
     }
+
+    framBusy = false;
+    // --- End FRAM write section ---
     
 
     uint32_t unixTime = getUnixTimestamp();
@@ -1143,50 +1157,42 @@ void WaterAlgorithm::resetFromError() {
 
 void WaterAlgorithm::loadCyclesFromStorage() {
     LOG_INFO("Loading cycles from FRAM...");
-    
-    // Load recent cycles from FRAM
-    if (loadCyclesFromFRAM(framCycles, 200)) { // Load max 200 cycles
+
+    framBusy = true;
+
+    if (loadCyclesFromFRAM(framCycles, FRAM_MAX_CYCLES)) {
         framDataLoaded = true;
         LOG_INFO("Loaded %d cycles from FRAM", framCycles.size());
-
-
         LOG_INFO("Daily volume already loaded from FRAM: %dml", dailyVolumeML);
 
-                // Just load today's cycles for display
+        // Load today's cycles for display
         uint32_t todayStart = (millis() / 1000) - (millis() / 1000) % 86400;
-        
+
         for (const auto& cycle : framCycles) {
             if (cycle.timestamp >= todayStart) {
                 todayCycles.push_back(cycle);
             }
         }
-        
+
         LOG_INFO("Loaded %d cycles from today", todayCycles.size());
-        
     } else {
         LOG_WARNING("Failed to load cycles from FRAM, starting fresh");
         framDataLoaded = false;
     }
+
+    framBusy = false;
 }
 
 void WaterAlgorithm::saveCycleToStorage(const PumpCycle& cycle) {
     if (saveCycleToFRAM(cycle)) {
         LOG_INFO("Cycle saved to FRAM successfully");
-        
+
         // Add to framCycles for immediate access
         framCycles.push_back(cycle);
-        
-        // Keep framCycles size reasonable
-        if (framCycles.size() > 200) {
+
+        // Keep framCycles size matching FRAM ring buffer
+        if (framCycles.size() > FRAM_MAX_CYCLES) {
             framCycles.erase(framCycles.begin());
-        }
-        
-        // Periodic cleanup of old data (once per day)
-        if (millis() - lastFRAMCleanup > 86400000UL) { // 24 hours
-            clearOldCyclesFromFRAM(14); // Keep 14 days
-            lastFRAMCleanup = millis();
-            loadCyclesFromStorage(); // Reload after cleanup
-            LOG_INFO("FRAM cleanup completed");
         }
     } else {
         LOG_ERROR("Failed to save cycle to FRAM");

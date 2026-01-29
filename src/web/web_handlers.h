@@ -45,4 +45,7 @@ void handleRefillAvailableVolume(AsyncWebServerRequest* request);
 void handleGetFillWaterMax(AsyncWebServerRequest* request);
 void handleSetFillWaterMax(AsyncWebServerRequest* request);
 
+// Cycle History endpoint
+void handleGetCycleHistory(AsyncWebServerRequest* request);
+
 #endif

@@ -20,11 +20,15 @@ void handleDashboard(AsyncWebServerRequest* request) {
         request->redirect("/login");
         return;
     }
-    request->send(200, "text/html", getDashboardHTML());
+    AsyncWebServerResponse* response = request->beginResponse_P(
+        200, "text/html", (const uint8_t*)DASHBOARD_HTML, strlen(DASHBOARD_HTML));
+    request->send(response);
 }
 
 void handleLoginPage(AsyncWebServerRequest* request) {
-    request->send(200, "text/html", getLoginHTML());
+    AsyncWebServerResponse* response = request->beginResponse_P(
+        200, "text/html", (const uint8_t*)LOGIN_HTML, strlen(LOGIN_HTML));
+    request->send(response);
 }
 
 void handleLogin(AsyncWebServerRequest* request) {
@@ -600,11 +604,81 @@ void handleSetFillWaterMax(AsyncWebServerRequest* request) {
     }
     
     waterAlgorithm.setFillWaterMax(value);
-    
+
     String response = "{";
     response += "\"success\":true,";
     response += "\"fill_water_max\":" + String(waterAlgorithm.getFillWaterMax());
     response += "}";
-    
+
     request->send(200, "application/json", response);
+}
+
+// ===============================
+// CYCLE HISTORY HANDLER
+// ===============================
+
+extern volatile bool framBusy;
+
+void handleGetCycleHistory(AsyncWebServerRequest* request) {
+    if (!checkAuthentication(request)) {
+        request->send(401, "text/plain", "Unauthorized");
+        return;
+    }
+
+    if (framBusy) {
+        request->send(503, "application/json", "{\"success\":false,\"error\":\"System busy\"}");
+        return;
+    }
+
+    const std::vector<PumpCycle>& cycles = waterAlgorithm.getCycleHistory();
+
+    JsonDocument doc;
+    doc["success"] = true;
+    doc["total"] = cycles.size();
+
+    JsonArray arr = doc["cycles"].to<JsonArray>();
+
+    // Iterate newest-first (vector is ordered oldest-first from FRAM load)
+    for (int i = (int)cycles.size() - 1; i >= 0; i--) {
+        const PumpCycle& c = cycles[i];
+        JsonObject obj = arr.add<JsonObject>();
+
+        obj["ts"] = c.timestamp;
+        obj["gap1_s"] = c.time_gap_1;
+        obj["gap2_s"] = c.time_gap_2;
+        obj["wt_s"] = c.water_trigger_time;
+        obj["pump_s"] = c.pump_duration;
+        obj["attempts"] = c.pump_attempts;
+        obj["volume_ml"] = c.volume_dose;
+        obj["alarm"] = c.error_code;
+
+        // Decoded sensor flags
+        bool s1_deb_fail = c.sensor_results & PumpCycle::RESULT_SENSOR1_DEBOUNCE_FAIL;
+        bool s2_deb_fail = c.sensor_results & PumpCycle::RESULT_SENSOR2_DEBOUNCE_FAIL;
+
+        obj["s1_deb"] = !s1_deb_fail;
+        obj["s2_deb"] = !s2_deb_fail;
+        obj["deb_ok"] = !(c.sensor_results & PumpCycle::RESULT_FALSE_TRIGGER);
+
+        // Release: 1=OK, 0=N/A (nie sprawdzany), -1=FAIL
+        if (s1_deb_fail) {
+            obj["s1_rel"] = 0;
+        } else if (c.sensor_results & (PumpCycle::RESULT_SENSOR1_RELEASE_FAIL | PumpCycle::RESULT_WATER_FAIL)) {
+            obj["s1_rel"] = -1;
+        } else {
+            obj["s1_rel"] = 1;
+        }
+
+        if (s2_deb_fail) {
+            obj["s2_rel"] = 0;
+        } else if (c.sensor_results & (PumpCycle::RESULT_SENSOR2_RELEASE_FAIL | PumpCycle::RESULT_WATER_FAIL)) {
+            obj["s2_rel"] = -1;
+        } else {
+            obj["s2_rel"] = 1;
+        }
+    }
+
+    String jsonResponse;
+    serializeJson(doc, jsonResponse);
+    request->send(200, "application/json", jsonResponse);
 }

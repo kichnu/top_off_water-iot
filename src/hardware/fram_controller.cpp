@@ -8,12 +8,13 @@
 
 #include "../crypto/fram_encryption.h"
 
-
-
+static_assert(sizeof(PumpCycle) == FRAM_CYCLE_SIZE,
+    "FRAM_CYCLE_SIZE must match sizeof(PumpCycle)! Update FRAM_CYCLE_SIZE in fram_controller.h");
 
 
 Adafruit_FRAM_I2C fram = Adafruit_FRAM_I2C();
 bool framInitialized = false;
+volatile bool framBusy = false;
 
 // Calculate simple checksum
 uint16_t calculateChecksum(uint8_t* data, size_t len) {
@@ -62,7 +63,22 @@ bool initFRAM() {
         
         LOG_INFO("FRAM initialized with defaults");
     }
-    
+
+    // Validate cycle metadata against FRAM_MAX_CYCLES (handles 200→30 transition)
+    uint16_t bootCycleCount = 0;
+    uint16_t bootWriteIndex = 0;
+    fram.read(FRAM_ADDR_CYCLE_COUNT, (uint8_t*)&bootCycleCount, 2);
+    fram.read(FRAM_ADDR_CYCLE_INDEX, (uint8_t*)&bootWriteIndex, 2);
+
+    if (bootCycleCount > FRAM_MAX_CYCLES || bootWriteIndex >= FRAM_MAX_CYCLES) {
+        LOG_WARNING("Cycle metadata out of range (count=%d, index=%d, max=%d), resetting",
+                    bootCycleCount, bootWriteIndex, FRAM_MAX_CYCLES);
+        uint16_t zero = 0;
+        fram.write(FRAM_ADDR_CYCLE_COUNT, (uint8_t*)&zero, 2);
+        fram.write(FRAM_ADDR_CYCLE_INDEX, (uint8_t*)&zero, 2);
+        LOG_INFO("Cycle ring buffer reset");
+    }
+
     return true;
 }
 bool verifyFRAM() {
@@ -335,44 +351,6 @@ uint16_t getCycleCountFromFRAM() {
     uint16_t cycleCount = 0;
     fram.read(FRAM_ADDR_CYCLE_COUNT, (uint8_t*)&cycleCount, 2);
     return cycleCount;
-}
-
-bool clearOldCyclesFromFRAM(uint32_t olderThanDays) {
-    if (!framInitialized) return false;
-    
-    uint32_t cutoffTime = (millis() / 1000) - (olderThanDays * 24 * 3600);
-    
-    // For now, simple implementation - clear all if any is too old
-    // More sophisticated implementation would compact the data
-    
-    std::vector<PumpCycle> allCycles;
-    if (!loadCyclesFromFRAM(allCycles)) return false;
-    
-    // Filter recent cycles
-    std::vector<PumpCycle> recentCycles;
-    for (const auto& cycle : allCycles) {
-        if (cycle.timestamp >= cutoffTime) {
-            recentCycles.push_back(cycle);
-        }
-    }
-    
-    if (recentCycles.size() == allCycles.size()) {
-        LOG_INFO("No old cycles to clear");
-        return true;
-    }
-    
-    // Reset FRAM cycle data
-    uint16_t zero = 0;
-    fram.write(FRAM_ADDR_CYCLE_COUNT, (uint8_t*)&zero, 2);
-    fram.write(FRAM_ADDR_CYCLE_INDEX, (uint8_t*)&zero, 2);
-    
-    // Save recent cycles back
-    for (const auto& cycle : recentCycles) {
-        saveCycleToFRAM(cycle);
-    }
-    
-    LOG_INFO("Cleared old cycles, kept %d recent cycles", recentCycles.size());
-    return true;
 }
 
 // ===============================

@@ -46,7 +46,10 @@ void initWebServer() {
     // 🆕 NEW: Fill Water Max endpoints
     server.on("/api/fill-water-max", HTTP_GET, handleGetFillWaterMax);
     server.on("/api/set-fill-water-max", HTTP_POST, handleSetFillWaterMax);
-    
+
+    // Cycle History endpoint
+    server.on("/api/cycle-history", HTTP_GET, handleGetCycleHistory);
+
     // 404 handler
     server.onNotFound([](AsyncWebServerRequest* request) {
         request->send(404, "text/plain", "Not Found");

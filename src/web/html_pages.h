@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 
-String getDashboardHTML();
-String getLoginHTML();
+extern const char* LOGIN_HTML;
+extern const char* DASHBOARD_HTML;
 
 #endif

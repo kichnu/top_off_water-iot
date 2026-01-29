@@ -58,8 +58,8 @@ struct PumpCycle;
 #define FRAM_ADDR_CYCLE_INDEX  (FRAM_ESP32_BASE + 0x32)  // 2 bytes - current write index (circular buffer)
 #define FRAM_ADDR_CYCLE_DATA   (FRAM_ESP32_BASE + 0x100) // Start danych cykli
 
-#define FRAM_MAX_CYCLES        200     // Maksymalnie 200 cykli (~20 dni)
-#define FRAM_CYCLE_SIZE        24      // Rozmiar jednego cyklu w bajtach
+#define FRAM_MAX_CYCLES        30      // Maksymalnie 30 cykli (~5 dni)
+#define FRAM_CYCLE_SIZE        28      // musi == sizeof(PumpCycle), weryfikacja w fram_controller.cpp
 
 // Common constants
 // #define FRAM_MAGIC_NUMBER      0x57415452  // "WATR" in hex
@@ -84,7 +84,8 @@ bool loadDailyVolumeFromFRAM(uint16_t& dailyVolume, uint32_t& utcDay);
 bool saveCycleToFRAM(const PumpCycle& cycle);
 bool loadCyclesFromFRAM(std::vector<PumpCycle>& cycles, uint16_t maxCount = FRAM_MAX_CYCLES);
 uint16_t getCycleCountFromFRAM();
-bool clearOldCyclesFromFRAM(uint32_t olderThanDays = 14);
+// FRAM busy flag - prevents concurrent I2C access during writes
+extern volatile bool framBusy;
 
 // Struktura statystyk błędów
 struct ErrorStats {

@@ -674,7 +674,7 @@ const char* DASHBOARD_HTML = R"rawliteral(
         /* ===== THIRD CARD: Statistics ===== */
         .stats-columns {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(2, 1fr);
             gap: 12px;
             align-items: start;
         }
@@ -841,6 +841,48 @@ const char* DASHBOARD_HTML = R"rawliteral(
             color: var(--text-muted);
             font-size: 0.75rem;
         }
+
+        /* Cycle History Table */
+        .cycle-table-wrap {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            max-height: 420px;
+            overflow-y: auto;
+            margin-top: 12px;
+        }
+        .cycle-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.72rem;
+            white-space: nowrap;
+        }
+        .cycle-table th {
+            background: var(--bg-input);
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            padding: 7px 8px;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+        .cycle-table td {
+            padding: 5px 8px;
+            text-align: center;
+            border-bottom: 1px solid rgba(45, 58, 79, 0.4);
+            color: var(--text-secondary);
+            font-family: 'Courier New', monospace;
+        }
+        .cycle-table tr:hover td {
+            background: rgba(56, 189, 248, 0.06);
+        }
+        .ct-ok { color: var(--accent-green); }
+        .ct-fail { color: var(--accent-red); font-weight: 600; }
+        .ct-warn { color: var(--accent-yellow); }
+        .ct-n { color: var(--text-primary); }
     </style>
 </head>
 <body>
@@ -991,33 +1033,43 @@ const char* DASHBOARD_HTML = R"rawliteral(
                         <button id="resetDailyVolumeBtn" class="btn btn-secondary btn-small" onclick="resetDailyVolume()">Reset</button>
                     </div>
                 </div>
-                <!-- Column 3: Statistics (Load + Reset combined) -->
-                <div class="stat-column">
-                    <h3>Sensor Errors</h3>
-                    <div class="stat-content">
-                        <div class="stat-line">
-                            <span class="stat-label">Err activate:</span>
-                            <span class="stat-value" id="gap1Value">—</span>
-                        </div>
-                        <div class="stat-line">
-                            <span class="stat-label">Err deactivate:</span>
-                            <span class="stat-value" id="gap2Value">—</span>
-                        </div>
-                        <div class="stat-line">
-                            <span class="stat-label">Err pump:</span>
-                            <span class="stat-value" id="waterValue">—</span>
-                        </div>
-                    <div class="stat-errors">
-                        <button id="loadStatsBtn" class="btn btn-secondary btn-small" onclick="manualLoadStatistics()">Load</button>
-                        <button id="resetStatsBtn" class="btn btn-secondary btn-small" onclick="resetStatistics()">Reset</button>
-                    </div>
-    
-                    </div>
-                </div>
             </div>
 
             
             
+        </div>
+
+        <!-- CYCLE HISTORY CARD -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-header-icon" style="background: rgba(34, 211, 213, 0.15);">
+                    <svg fill="currentColor" style="color: #22d3d5;" viewBox="0 0 24 24"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
+                </div>
+                <h2>Cycle History</h2>
+            </div>
+            <button class="btn btn-secondary" onclick="loadCycleHistory()" id="loadCyclesBtn" style="margin-bottom:4px;">Load History</button>
+            <div class="cycle-table-wrap">
+                <table class="cycle-table">
+                    <thead>
+                        <tr>
+                            <th>Date/Time</th>
+                            <th>S1 Deb</th>
+                            <th>S2 Deb</th>
+                            <th>Debounce</th>
+                            <th>Gap1</th>
+                            <th>Att</th>
+                            <th>S1 Rel</th>
+                            <th>S2 Rel</th>
+                            <th>Vol</th>
+                            <th>Pump</th>
+                            <th>Alarm</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cycleTableBody">
+                        <tr><td colspan="11" style="color:var(--text-muted);">Click "Load History"</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <!-- FOURTH CARD: Pump Setting -->
@@ -1534,61 +1586,6 @@ const char* DASHBOARD_HTML = R"rawliteral(
                 });
         }
 
-        // ============================================
-        // STATISTICS FUNCTIONS
-        // ============================================
-        function loadStatistics() {
-            fetch("api/get-statistics")
-                .then((response) => response.json())
-                .then((data) => {
-                    if (data.success) {
-                        document.getElementById("gap1Value").textContent = data.gap1_fail_sum;
-                        document.getElementById("gap2Value").textContent = data.gap2_fail_sum;
-                        document.getElementById("waterValue").textContent = data.water_fail_sum;
-                        // document.getElementById("resetTime").textContent = data.last_reset_formatted || "Unknown";
-                    }
-                })
-                .catch((error) => {
-                    console.error("Failed to load statistics:", error);
-                });
-        }
-
-        function manualLoadStatistics() {
-            const btn = document.getElementById("loadStatsBtn");
-            btn.disabled = true;
-            btn.textContent = "Loading...";
-
-            loadStatistics();
-
-            setTimeout(() => {
-                btn.disabled = false;
-                btn.textContent = "Load Statistics";
-            }, 1000);
-        }
-
-        function resetStatistics() {
-            if (!confirm("Reset all error statistics to zero?")) return;
-
-            const btn = document.getElementById("resetStatsBtn");
-            btn.disabled = true;
-            btn.textContent = "Resetting...";
-
-            fetch("api/reset-statistics", { method: "POST" })
-                .then((response) => response.json())
-                .then((data) => {
-                    if (data.success) {
-                        showNotification("Statistics reset", "success");
-                        loadStatistics();
-                    } else {
-                        showNotification("Failed to reset", "error");
-                    }
-                })
-                .catch(() => showNotification("Network error", "error"))
-                .finally(() => {
-                    btn.disabled = false;
-                    btn.textContent = "Reset Statistics";
-                });
-        }
 
         // ============================================
         // DAILY VOLUME FUNCTIONS
@@ -1760,6 +1757,62 @@ const char* DASHBOARD_HTML = R"rawliteral(
         }
 
         // ============================================
+        // CYCLE HISTORY
+        // ============================================
+        function loadCycleHistory() {
+            var btn = document.getElementById("loadCyclesBtn");
+            btn.disabled = true;
+            btn.textContent = "Loading...";
+
+            secureFetch("api/cycle-history")
+                .then(function(r) { return r ? r.json() : null; })
+                .then(function(data) {
+                    if (!data) return;
+                    if (!data.success) {
+                        showNotification(data.error || "Failed to load cycles", "error");
+                        return;
+                    }
+                    var tb = document.getElementById("cycleTableBody");
+                    tb.innerHTML = "";
+                    if (!data.cycles || data.cycles.length === 0) {
+                        tb.innerHTML = '<tr><td colspan="11" style="color:var(--text-muted);">No cycles recorded</td></tr>';
+                        return;
+                    }
+                    data.cycles.forEach(function(c) {
+                        var tr = document.createElement("tr");
+                        var d = new Date(c.ts * 1000);
+                        var ds = d.toLocaleDateString("en-GB",{day:"2-digit",month:"2-digit"})
+                                 + " " + d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});
+
+                        var al = "-", ac = "ct-n";
+                        if (c.alarm === 1) { al = "ERR1"; ac = "ct-fail"; }
+                        else if (c.alarm === 2) { al = "ERR2"; ac = "ct-fail"; }
+                        else if (c.alarm === 3) { al = "ERR0"; ac = "ct-fail"; }
+
+                        function f(ok) { return ok ? '<td class="ct-ok">OK</td>' : '<td class="ct-fail">FAIL</td>'; }
+                        function r(v) { return v===1 ? '<td class="ct-ok">OK</td>' : v===-1 ? '<td class="ct-fail">FAIL</td>' : '<td class="ct-n">X</td>'; }
+
+                        tr.innerHTML =
+                            '<td class="ct-n">' + ds + '</td>' +
+                            f(c.s1_deb) + f(c.s2_deb) + f(c.deb_ok) +
+                            '<td class="ct-n">' + c.gap1_s + 's</td>' +
+                            '<td class="' + (c.attempts > 1 ? 'ct-warn' : 'ct-n') + '">' + c.attempts + '</td>' +
+                            r(c.s1_rel) + r(c.s2_rel) +
+                            '<td class="ct-n">' + c.volume_ml + 'ml</td>' +
+                            '<td class="ct-n">' + c.pump_s + 's</td>' +
+                            '<td class="' + ac + '">' + al + '</td>';
+                        tb.appendChild(tr);
+                    });
+                    showNotification("Loaded " + data.total + " cycles", "success");
+                })
+                .catch(function() { showNotification("Network error", "error"); })
+                .finally(function() {
+                    btn.disabled = false;
+                    btn.textContent = "Load History";
+                });
+        }
+
+        // ============================================
         // INITIALIZATION
         // ============================================
 
@@ -1773,7 +1826,6 @@ const char* DASHBOARD_HTML = R"rawliteral(
         updateStatus();
         loadSystemState();
         loadVolumePerSecond();
-        loadStatistics();
         loadDailyVolume();
         loadAvailableVolume();
     </script>
@@ -1781,10 +1833,3 @@ const char* DASHBOARD_HTML = R"rawliteral(
 </html>
 )rawliteral";
 
-String getLoginHTML() {
-    return String(LOGIN_HTML);
-}
-
-String getDashboardHTML() {
-    return String(DASHBOARD_HTML);
-}

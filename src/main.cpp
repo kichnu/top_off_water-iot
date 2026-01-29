@@ -103,6 +103,7 @@ void setup() {
 
     initNVS();
     loadVolumeFromNVS();
+    waterAlgorithm.initFromFRAM();
 
     bool credentials_loaded = initCredentialsManager();
     

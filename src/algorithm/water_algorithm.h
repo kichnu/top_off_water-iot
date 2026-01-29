@@ -24,7 +24,6 @@ private:
 
     // FRAM cycle management
     std::vector<PumpCycle> framCycles;
-    uint32_t lastFRAMCleanup;
     bool framDataLoaded;
 
     // Sensor states
@@ -104,6 +103,9 @@ private:
 public:
     WaterAlgorithm();
 
+    // Initialize FRAM-backed data AFTER initFRAM()/initNVS()
+    void initFromFRAM();
+
     // 🆕 NEW: Initialize daily volume AFTER RTC is ready
     void initDailyVolume();
 
@@ -143,6 +145,9 @@ public:
 
     // Get recent cycles for debugging
     std::vector<PumpCycle> getRecentCycles(size_t count = 10);
+
+    // Get full cycle history (all entries from framCycles, newest first in FRAM load order)
+    const std::vector<PumpCycle>& getCycleHistory() const { return framCycles; }
 
     // ============== UI STATUS GETTERS ==============
     uint8_t getPumpAttempts() const { return pumpAttempts; }
