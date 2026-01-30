@@ -50,8 +50,13 @@ void initWebServer() {
     // Cycle History endpoint
     server.on("/api/cycle-history", HTTP_GET, handleGetCycleHistory);
 
-    // 404 handler
+    // 404 handler - also enforce whitelist
     server.onNotFound([](AsyncWebServerRequest* request) {
+        IPAddress clientIP = request->client()->remoteIP();
+        if (!isTrustedProxyIP(clientIP) && !isIPAllowed(clientIP)) {
+            request->send(403, "text/plain", "Forbidden");
+            return;
+        }
         request->send(404, "text/plain", "Not Found");
     });
     
@@ -72,6 +77,13 @@ bool checkAuthentication(AsyncWebServerRequest* request) {
         return true;
     }
     
+    // ============== WHITELIST CHECK ==============
+    // Only whitelisted IPs can access the system
+    if (!isIPAllowed(clientIP)) {
+        LOG_WARNING("IP %s not on whitelist - access denied", clientIP.toString().c_str());
+        return false;
+    }
+
     // Check if IP is blocked
     if (isIPBlocked(clientIP)) {
         return false;

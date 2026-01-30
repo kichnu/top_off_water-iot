@@ -1,553 +1,240 @@
-# ESP32-C3 Automated Water Top-Off System 🌱
+# ESP32-C3 Automated Water Top-Off System
 
-An intelligent, automated water management system built on ESP32-C3, featuring advanced sensor algorithms, web-based control, cloud logging, and **secure credential management** with dual-mode operation.
+Embedded system for automated aquarium/plant water level management. Built on Seeed Xiao ESP32-C3 with PlatformIO/Arduino framework. Features dual float sensor validation, multi-phase dosing algorithm, web dashboard, IP-based access control, and encrypted credential storage in FRAM.
 
-![ESP32-C3](https://img.shields.io/badge/ESP32-C3-blue)
-![Platform](https://img.shields.io/badge/PlatformIO-Compatible-orange)
-![License](https://img.shields.io/badge/License-MIT-green)
-![Build](https://img.shields.io/badge/Build-Passing-brightgreen)
-![Security](https://img.shields.io/badge/Security-AES256-red)
+## Hardware
 
-## 🚀 Features
+**Platform:** Seeed Xiao ESP32-C3 (RISC-V, WiFi, 4MB flash)
 
-### Core Functionality
-- **Intelligent Water Level Detection** - Dual float sensor system with advanced timing algorithms
-- **Automated Pump Control** - Precise volume delivery with configurable flow rates
-- **Algorithm-Driven Decision Making** - Smart timing analysis for optimal water management
-- **Error Detection & Recovery** - Built-in safety mechanisms and failure handling
+**Sensors and I/O:**
+- 2x float sensors (NC type, pull-up, active LOW) - independent water level detection
+- 1x pump relay output (HIGH = ON) - controls 12V dosing pump
+- 1x error signal output - pulsed error codes (1 pulse = daily limit, 2 = pump failure)
+- 1x button input (pull-up) - error reset (short press) / provisioning mode (5s hold)
 
-### 🔐 Security & Credential Management (NEW!)
-- **Dual-Mode Operation** - Programming Mode for setup, Production Mode for operation
-- **FRAM Credential Storage** - Encrypted WiFi/Admin/VPS credentials stored in non-volatile FRAM
-- **CLI Programming Interface** - Secure command-line interface for credential programming
-- **Dynamic Credential Loading** - Automatic loading from FRAM with hardcoded fallback
-- **AES-256 Encryption** - Military-grade encryption for sensitive data protection
+**Peripherals (I2C bus):**
+- DS3231 RTC - hardware clock with battery backup, NTP-synchronized, UTC storage
+- FRAM 32KB - non-volatile storage for credentials (AES-256 encrypted), pump cycle history (ring buffer), settings, error statistics
 
-### Web Interface
-- **Professional Dashboard** - Real-time monitoring and control
-- **Mobile-Responsive Design** - Works on desktop, tablet, and mobile
-- **Secure Authentication** - Password protection with session management
-- **Rate Limiting** - Protection against abuse and unauthorized access
+**Time management:** RTC stores UTC. Display times auto-converted to local timezone (Poland CET/CEST with automatic DST). NTP sync at boot + hourly via IP addresses (DNS-independent). Fallback to ESP32 system time if DS3231 absent.
 
-### Data Management
-- **FRAM Storage** - Non-volatile data persistence for settings and cycle history
-- **VPS Cloud Logging** - Remote monitoring and data analytics
-- **Statistical Tracking** - Error counts, performance metrics, and trends
-- **Real-Time Clock Integration** - Accurate timestamping with DS3231 or internal RTC fallback
+## Algorithm
 
-### RTC & Time Management System
+The dosing algorithm is a state machine that validates water level drop through multiple phases before activating the pump. Each completed cycle produces a structured data record with timing and sensor diagnostics.
 
-The system implements intelligent time management with automatic timezone handling, NTP synchronization, and robust fallback mechanisms.
+### State Flow
 
-#### Timezone Configuration
-- **Automatic DST Handling**: Configured for Poland (CET/CEST) with rule `CET-1CEST,M3.5.0,M10.5.0/3`
-  - CET (UTC+1) in winter
-  - CEST (UTC+2) in summer  
-  - Automatic switching: Last Sunday of March at 2:00 AM and October at 3:00 AM
-- **Set Once, Works Forever**: Timezone configured at boot and persists throughout runtime
-- **No Manual DST Updates**: System handles DST transitions automatically without firmware updates
-
-#### NTP Synchronization
-- **Multiple Servers**: Uses IP addresses for reliability (DNS-independent)
-  - Primary: `216.239.35.0` (Google Public NTP)
-  - Backup: `216.239.35.4` (Google Public NTP)
-  - Tertiary: `162.159.200.1` (Cloudflare Time)
-- **Initial Sync**: Attempts NTP synchronization during boot (20 second timeout)
-- **Periodic Sync**: Automatic hourly synchronization to maintain accuracy
-- **Timezone Preservation**: All NTP timestamps are UTC; conversion to local time happens automatically via `localtime_r()`
-
-#### RTC Storage & Display
-- **Storage Format**: DS3231 RTC always stores UTC timestamps (no timezone offsets)
-- **Display Format**: All displayed times automatically converted to Polish local time (CET/CEST)
-- **API Responses**: `rtc_time` field shows local time with automatic DST adjustment
-- **Unix Timestamps**: `/api/status` provides both formatted local time and UTC unix timestamp
-
-#### Recovery & Fallback Logic
-
-**Normal Operation**
-- DS3231 external RTC detected and operational
-- Time synchronized with NTP servers
-- Battery healthy, accurate timekeeping
-- Status: `"DS3231 RTC (synchronized)"`
-
-**Power Loss Detection (OSF Flag)**
-- DS3231 reports `lostPower()` - battery dead or removed during power-off
-- System sets RTC to compile time to clear OSF flag
-- Immediate NTP synchronization attempt
-- **Battery warning persists** until physical battery replacement
-- Status: `"DS3231 RTC (battery may be dead - awaiting NTP sync)"`
-- UI displays: "⚠️ Battery may be dead - replace CR2032"
-
-**Stale Time Detection**
-- RTC time older than firmware compile time (+ 5 minute margin)
-- Indicates RTC was not updated during development/testing
-- NTP synchronization attempted to update time
-- Not a battery issue - RTC operational but outdated
-- Status: `"DS3231 RTC (syncing with NTP...)"`
-
-**NTP Sync Failure**
-- WiFi unavailable or NTP servers unreachable
-- Firewall blocking UDP port 123 or DNS issues
-- System retries hourly until successful
-- RTC continues with last known time (may be stale)
-- Status: `"DS3231 RTC (syncing with NTP...)"`
-
-**No DS3231 Detected**
-- External RTC not found on I2C bus (address 0x68)
-- Fallback to ESP32 internal system time
-- Attempts `getLocalTime()` for NTP-synchronized time
-- If unavailable, uses firmware compile timestamp
-- Status: `"ESP32 system time (fallback)"`
-
-#### Important Distinctions
-
-**Battery Issue vs. Needs Sync**
-- `battery_issue`: Physical hardware problem - battery dead/missing
-  - Detected via OSF (Oscillator Stop Flag)
-  - **Never cleared automatically** - requires physical battery replacement
-  - Persists even after successful NTP sync
-  - Critical warning displayed in UI with red styling
-  
-- `needs_sync`: Time is outdated but hardware OK
-  - RTC operational but time not current
-  - **Cleared after successful NTP sync**
-  - Informational message only
-
-**Time Source Indicators**
-- API endpoint `/api/status` includes detailed RTC status:
-  - `rtc_info`: Human-readable status string
-  - `rtc_hardware`: Boolean - true if DS3231 active
-  - `rtc_needs_sync`: Boolean - time synchronization needed
-  - `rtc_battery_issue`: Boolean - physical battery problem detected
-
-**Example API Response**
-```json
-{
-  "rtc_time": "2025-10-02 19:35:59",
-  "rtc_info": "DS3231 RTC (synchronized)",
-  "rtc_hardware": true,
-  "rtc_needs_sync": false,
-  "rtc_battery_issue": false,
-  "unix_time": 1759426559
-}
-
-### Safety & Security
-- **IP Whitelisting** - Restrict access to authorized devices
-- **Session Management** - Secure token-based authentication
-- **Global Pump Control** - Emergency disable with auto-recovery
-- **Comprehensive Logging** - Debug and audit trail capabilities
-
-## 🎯 Dual-Mode System Architecture
-
-The system operates in two distinct modes with conditional compilation:
-
-### 🔧 Programming Mode
-- **Purpose**: Secure credential programming and system setup
-- **Features**: 
-  - CLI interface via Serial
-  - FRAM credential programming
-  - Encryption/decryption testing
-  - JSON configuration support
-  - Water system DISABLED for security
-- **Access**: `pio run -e programming`
-
-### 🏭 Production Mode  
-- **Purpose**: Full water system operation
-- **Features**:
-  - Complete water management system
-  - Dynamic credential loading from FRAM
-  - Web interface and API
-  - VPS logging with FRAM credentials
-  - CLI interface DISABLED for security
-- **Access**: `pio run -e production`
-
-## 📋 Hardware Requirements
-
-### Minimum Requirements
-- **ESP32-C3** (Seeed Xiao ESP32-C3 recommended)
-- **2x Float Sensors** (NC type with pull-up resistors)
-- **Water Pump** with relay control (12V recommended)
-- **Power Supply** (5V/2A minimum)
-
-### Recommended Add-ons
-- **DS3231 RTC Module** (I2C) for accurate timekeeping
-- **FRAM I2C Memory** (32KB) for data persistence and **credential storage** 🆕
-- **Status LED** for visual feedback
-- **Reset Button** for error recovery
-
-### Pin Configuration (Seeed Xiao ESP32-C3)
 ```
-Pin 2:  Pump Relay Control
-Pin 3:  Water Sensor 1 (Float Switch)
-Pin 4:  Water Sensor 2 (Float Switch) 
-Pin 5:  Status LED
-Pin 6:  RTC/FRAM SDA (I2C)
-Pin 7:  RTC/FRAM SCL (I2C)
-Pin 9:  Error Signal Output
-Pin 10: Reset Button Input
+IDLE -> PRE_QUALIFICATION -> SETTLING -> DEBOUNCING -> PUMPING_AND_VERIFY -> LOGGING -> IDLE
+                |                           |                 |
+                v                           v                 v
+          IDLE (silent)              IDLE (false trigger)   ERROR / retry
 ```
 
-## 🛠️ Installation
+### Phase 1: Drop Validation
 
-### Prerequisites
-- [PlatformIO](https://platformio.org/) installed
-- [Git](https://git-scm.com/) for version control
-- Basic electronics knowledge for hardware assembly
+**Pre-qualification** - Fast initial filter. When any sensor reads LOW (water below threshold), the system requires multiple consecutive LOW readings within a short window. Filters out momentary disturbances (waves, vibrations). Failure returns silently to IDLE without logging.
 
-### 1. Clone Repository
-```bash
-git clone https://github.com/yourusername/esp32-water-system.git
-cd esp32-water-system
+**Settling** - Passive wait period after pre-qualification. No sensor reads - allows water surface to stabilize before precise measurement.
+
+**Debouncing** - Full verification. Both sensors are independently monitored at fixed intervals. Each sensor must produce a required number of consecutive LOW readings to "pass" debounce. Possible outcomes:
+- Both sensors pass -> pump starts (nominal case)
+- One sensor passes, one times out -> pump starts with GAP1_FAIL flag
+- Neither passes -> logged as FALSE_TRIGGER, return to IDLE
+
+**time_gap_1** - Recorded as the time difference between sensor 1 and sensor 2 completing debounce. Indicates how evenly both sensors detected the drop.
+
+### Phase 2: Pump and Release Verification
+
+After debounce, the pump runs for a calculated duration (`SINGLE_DOSE_VOLUME / volumePerSecond`). During pumping, sensors are monitored for HIGH (water rising). Each sensor that triggered the cycle must confirm release (multiple consecutive HIGH readings).
+
+**Outcomes:**
+- All required sensors confirm -> success, log cycle
+- Partial confirmation -> success with RELEASE_FAIL flag for unconfirmed sensor
+- No confirmation within timeout -> WATER_FAIL, retry (up to 3 attempts)
+- All retries exhausted -> ERROR state (requires manual reset via button or web)
+
+**time_gap_2** - Time difference between sensor 1 and sensor 2 confirming release. Indicates pump delivery symmetry.
+
+**water_trigger_time** - Time from pump start to first sensor confirmation. Indicates pump effectiveness and tube/sensor health.
+
+### Safety Limits
+
+- **Daily volume limit** (configurable, default 2000ml) - exceeding triggers ERROR state
+- **Available volume tracking** - tracks remaining water in source container
+- **System disable** - manual kill switch via web with 30-minute auto-re-enable
+- **24h auto-restart** - firmware restarts ESP32 after 24h uptime
+
+### Reported Cycle Data
+
+Each cycle records: unix timestamp, time_gap_1, time_gap_2, water_trigger_time, pump duration, pump attempts, volume (ml), sensor result flags (debounce pass/fail per sensor, release pass/fail per sensor, false trigger), error code. Last ~200 cycles stored in FRAM ring buffer.
+
+## Tech Stack
+
+| Component | Technology |
+|---|---|
+| Platform | PlatformIO, Arduino framework |
+| MCU | ESP32-C3 (Seeed Xiao) |
+| Web server | ESPAsyncWebServer + AsyncTCP |
+| JSON | ArduinoJson 7.x |
+| RTC | RTClib (Adafruit) - DS3231 |
+| Storage | Adafruit FRAM I2C |
+| Encryption | mbedtls (AES-256-CBC, SHA-256) - bundled with ESP-IDF |
+| Auth | SHA-256 password hash, random session tokens, HttpOnly cookies |
+
+## Security and Access Control
+
+### Network Access Model
+
+```
+Incoming request
+  |
+  +-- Trusted VPS IP (WireGuard tunnel) --> full access, no login required
+  |
+  +-- IP on whitelist --> rate limit -> session check -> access / 401
+  |
+  +-- IP NOT on whitelist --> 403 Forbidden (all endpoints, including /login)
 ```
 
-### 2. Hardware Setup
-Assemble hardware according to [Hardware Setup Guide](docs/hardware-setup.md).
+**IP whitelist** - Hardcoded list of allowed LAN IPs (`config.cpp`). IPs not on the list are permanently blocked from all endpoints. Whitelisted IPs are additionally exempt from rate limiting and brute-force lockout.
 
-**⚠️ IMPORTANT**: Install FRAM memory module for credential storage!
+**Trusted VPS proxy** - A single hardcoded IP (WireGuard tunnel endpoint) bypasses all authentication. Designed for reverse proxy access from a VPS, allowing remote management without exposing ESP32 directly to the internet.
 
-### 3. Credential Programming (First Time Setup)
+**Session authentication** - Login via password (SHA-256 hashed, compared against FRAM-stored hash). Sessions are token-based, bound to client IP, HttpOnly cookie, max 10 sessions total / 3 per IP, configurable timeout (default 30 min).
 
-#### Step 3a: Upload Programming Mode
-```bash
-# Upload programming firmware
-pio run -e programming -t upload
+**Rate limiting** - Max 5 requests/second per IP. After 10 failed login attempts, IP blocked for 60 seconds. Whitelisted IPs bypass both mechanisms.
 
-# Open CLI interface
-pio device monitor -e programming
-```
+**Credential storage** - WiFi SSID/password, admin password hash, VPS token, device ID stored in FRAM encrypted with AES-256-CBC using device-specific keys. Configured via Captive Portal.
 
-#### Step 3b: Program Credentials via CLI
-```
-FRAM> help                    # Show available commands
-FRAM> detect                  # Verify FRAM is connected
-FRAM> program                 # Interactive credential programming
-```
+### Known Limitations
 
-**Interactive Programming Example:**
-```
-Device Name: DOLEWKA
-WiFi SSID: YourWiFiNetwork
-WiFi Password: YourWiFiPassword
-Admin Password: your_new_admin_password
-VPS Token: your_vps_auth_token_here
-```
+- HTTP only (no TLS) - traffic visible on WiFi network. Mitigated by IP whitelist restricting who can connect.
+- Session tokens generated with `random()` - limited entropy on ESP32.
+- No CSRF protection on POST endpoints.
+- Whitelist is hardcoded - changes require recompilation.
 
-#### Step 3c: Verify Programming
-```
-FRAM> verify                  # Confirm credentials are stored correctly
-FRAM> info                    # Show FRAM status and device info
-```
+## API Reference
 
-### 4. Production Deployment
-
-#### Step 4a: Upload Production Mode
-```bash
-# Upload production firmware  
-pio run -e production -t upload
-
-# Monitor startup logs
-pio device monitor -e production
-```
-
-#### Step 4b: Verify Dynamic Loading
-Check startup logs for:
-```
-✅ Credentials loaded from FRAM successfully
-Device ID: DOLEWKA
-WiFi connected - Using FRAM credentials
-```
-
-### 5. Access Web Interface
-Once connected to WiFi, access the dashboard at:
-```
-http://192.168.0.164
-```
-Login with the admin password you programmed in Step 3b.
-
-## 🔧 Configuration
-
-### Programming Mode Commands
-
-| Command | Description | Example |
-|---------|-------------|---------|
-| `help` | Show all commands | `FRAM> help` |
-| `detect` | Check FRAM connectivity | `FRAM> detect` |
-| `info` | Show device information | `FRAM> info` |
-| `program` | Interactive credential setup | `FRAM> program` |
-| `config` | JSON-based configuration | `FRAM> config` |
-| `verify` | Verify stored credentials | `FRAM> verify` |
-| `backup` | Backup FRAM contents | `FRAM> backup` |
-| `test` | Run system tests | `FRAM> test` |
-
-### JSON Configuration Example
-```bash
-FRAM> config
-```
-```json
-{
-  "device_name": "DOLEWKA",
-  "wifi_ssid": "YourNetwork", 
-  "wifi_password": "YourPassword",
-  "admin_password": "newadmin123",
-  "vps_token": "YourVpsToken"
-}
-```
-
-### Algorithm Parameters
-Located in `src/algorithm/algorithm_config.h`:
-
-```cpp
-#define TIME_TO_PUMP            450    // Seconds from trigger to pump start
-#define TIME_GAP_1_MAX          300    // Max wait for second sensor (Mode 1)
-#define TIME_GAP_2_MAX          300    // Max wait for second sensor (Mode 2)
-#define THRESHOLD_1             180    // Threshold for TIME_GAP_1 evaluation
-#define THRESHOLD_2             60     // Threshold for TIME_GAP_2 evaluation
-#define WATER_TRIGGER_MAX_TIME  120    // Max time for sensor response after pump
-#define PUMP_MAX_ATTEMPTS       3      // Max pump retry attempts
-#define SINGLE_DOSE_VOLUME      100    // ml per pump cycle
-#define FILL_WATER_MAX          2400   // ml maximum daily volume
-```
-
-### Pump Settings
-Configurable via web interface:
-- **Volume per Second**: 0.1 - 20.0 ml/s
-- **Extended Cycle Duration**: Default 15 seconds
-- **Extended Cycle Duration**: Default 30 seconds (calibration)
-
-## 📊 Security Model
-
-### Credential Storage
-- **Encryption**: AES-256-CBC with device-specific keys
-- **Storage**: Non-volatile FRAM memory
-- **Access**: Programming mode only
-- **Fallback**: Hardcoded credentials when FRAM empty
-
-### Mode Separation
-- **Programming Mode**: CLI enabled, water system disabled
-- **Production Mode**: CLI disabled, water system enabled
-- **Conditional Compilation**: Eliminates unused code from each build
+All `/api/*` endpoints require session authentication (cookie). Trusted VPS IP is exempt. Non-whitelisted IPs receive 403 on all endpoints.
 
 ### Authentication
-- **Admin Password**: SHA-256 hashed, stored encrypted in FRAM
-- **Session Management**: Token-based with configurable timeout
-- **Rate Limiting**: Protection against brute force attacks
 
-## 🔄 Production Workflow
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/login` | Login page (HTML) |
+| POST | `/api/login` | Authenticate (`password` form param) -> set session cookie |
+| POST | `/api/logout` | Destroy session |
 
-### Initial Setup
-1. **Program Credentials**: Use Programming Mode CLI
-2. **Deploy Production**: Upload Production Mode firmware
-3. **Verify Operation**: Check dynamic credential loading
-4. **Monitor System**: Use web dashboard and logs
+### Dashboard and Status
 
-### Credential Updates
-1. **Switch to Programming**: Upload Programming Mode
-2. **Update Credentials**: Use CLI interface 
-3. **Verify Changes**: Test new credentials
-4. **Redeploy Production**: Upload Production Mode
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/` | Dashboard (HTML, redirects to /login if no session) |
+| GET | `/api/status` | Full system status JSON (sensors, pump, algorithm state, RTC, WiFi, heap, uptime) |
 
-### Maintenance
-- **Backup FRAM**: Use `backup` command before changes
-- **Monitor Statistics**: Check error counts via web interface
-- **Update Settings**: Adjust pump parameters as needed
+### Pump Control
 
-## 📈 Monitoring & Analytics
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/pump/normal` | Manual pump cycle (configured duration) |
+| POST | `/api/pump/extended` | Extended pump cycle (calibration duration) |
+| POST | `/api/pump/stop` | Emergency stop |
 
-### Local Data
-- **FRAM Storage**: Last 200 pump cycles (14 days typical)
-- **Error Statistics**: Gap1, Gap2, Water trigger failure counts
-- **Daily Volume Tracking**: Automatic reset every 24 hours
-- **Encrypted Credentials**: Secure storage of sensitive data
+### Configuration
 
-### Cloud Integration
-Optional VPS logging includes:
-- Pump cycle completion events
-- Volume delivered and timing data
-- Algorithm performance metrics
-- Error statistics and trends
-- System health status
-- **Dynamic Device ID**: From FRAM credentials
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/api/pump-settings` | Get pump config (volume/s, cycle durations) |
+| POST | `/api/pump-settings` | Update volume per second (`volume_per_second` param, 0.1-20) |
+| GET/POST | `/api/system-toggle` | GET: system state. POST: toggle enable/disable (30min auto-enable) |
+| GET | `/api/fill-water-max` | Get daily volume limit |
+| POST | `/api/set-fill-water-max` | Set daily volume limit (`value` param, 100-10000ml) |
 
-### Data Format
-```json
-{
-  "device_id": "DOLEWKA",               // From FRAM
-  "timestamp": "2024-01-15 14:30:00",
-  "event_type": "AUTO_CYCLE_COMPLETE",
-  "volume_ml": 150,
-  "time_gap_1": 45,
-  "time_gap_2": 22,
-  "water_trigger_time": 8,
-  "gap1_fail_sum": 3,
-  "gap2_fail_sum": 1,
-  "water_fail_sum": 0,
-  "algorithm_data": "THRESHOLDS(GAP1:180s,GAP2:60s,WATER:30s) CURRENT(0-0-0) SUMS(3-1-0)"
-}
-```
+### Volume Tracking
 
-## 🛡️ Security Features
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/api/daily-volume` | Daily dosed volume, max, last reset day |
+| POST | `/api/reset-daily-volume` | Reset daily counter to 0 |
+| GET | `/api/available-volume` | Source container status (max, current, is_empty) |
+| POST | `/api/set-available-volume` | Set container capacity (`value`, 100-10000ml) |
+| POST | `/api/refill-available-volume` | Mark container as refilled (reset current to max) |
 
-- **AES-256 Encryption**: Military-grade credential protection
-- **Device-Specific Keys**: Unique encryption keys per device
-- **Mode Isolation**: Separate programming and production modes
-- **Password Authentication**: SHA-256 hashed passwords
-- **Session Management**: Token-based with configurable timeout
-- **Rate Limiting**: Prevents brute force attacks
-- **IP Filtering**: Whitelist trusted devices
-- **Request Throttling**: Configurable limits per IP
+### Statistics and History
 
-## 🐛 Troubleshooting
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/api/get-statistics` | Error counters (gap1/gap2/water failures, last reset time) |
+| POST | `/api/reset-statistics` | Reset error counters |
+| GET | `/api/cycle-history` | Full pump cycle history from FRAM (newest first) |
 
-### Credential Issues
+## Build and Deploy
 
-**FRAM Not Detected**
+Requires [PlatformIO](https://platformio.org/) (CLI or IDE plugin).
+
 ```bash
-# Programming Mode
-FRAM> detect
-[ERROR] FRAM not found
-```
-- Verify I2C wiring (SDA=Pin6, SCL=Pin7)
-- Check FRAM power supply (3.3V)
-- Test I2C bus with multimeter
+# Build firmware
+pio run -e seeed_xiao_esp32c3
 
-**Credential Loading Failed**
-```
-[WARN] Could not load credentials from FRAM, using fallback
-```
-- Credentials may not be programmed yet
-- Use Programming Mode to verify: `FRAM> verify`
-- Check FRAM memory integrity: `FRAM> test`
+# Build and upload
+pio run -e seeed_xiao_esp32c3 -t upload
 
-**Authentication Failed**
-- Verify admin password matches programmed credential
-- Use Programming Mode to check: `FRAM> verify`
-- Reset credentials if necessary: `FRAM> program`
+# Serial monitor (115200 baud)
+pio device monitor
 
-### Mode Switching Issues
-
-**Programming Mode Not Working**
-- Verify correct firmware uploaded: `pio run -e programming -t upload`
-- Check serial monitor connection and baud rate (115200)
-- Try reset button or power cycle
-
-**Production Mode Not Loading Credentials**
-- Check FRAM initialization logs on startup
-- Verify credentials programmed: Switch to Programming Mode
-- Check FRAM memory layout version
-
-### Common Issues
-
-**WiFi Connection Failed**
-- In Programming Mode: `FRAM> verify` to check stored credentials
-- Update credentials: `FRAM> program`
-- Check signal strength and network settings
-
-**Web Interface Inaccessible**
-- Verify Production Mode is uploaded and running
-- Check credential loading in startup logs
-- Confirm ESP32 connected to WiFi with FRAM credentials
-
-**VPS Logging Failed**
-- Check VPS token in programmed credentials
-- Verify network connectivity
-- Monitor logs for HTTP error codes
-
-### Debug Mode
-Enable detailed logging in Programming Mode:
-```
-FRAM> test      # Run comprehensive system tests
-FRAM> info      # Show detailed system information
+# Clean build
+pio run -e seeed_xiao_esp32c3 -t clean
 ```
 
-## 🎛️ Platform Configuration
+Single build environment (`seeed_xiao_esp32c3`). Partition scheme: `huge_app.csv`.
 
-### Build Environments
-```ini
-# Programming Mode
-[env:programming]
-build_flags = -DPROGRAMMING_MODE
-lib_deps = 
-    AsyncTCP
-    ArduinoJson
-    RTClib
-    Adafruit FRAM I2C
+## Provisioning (First-Time Setup)
 
-# Production Mode  
-[env:production]
-build_flags = -DPRODUCTION_MODE
-lib_deps = 
-    ESPAsyncWebServer
-    AsyncTCP
-    ArduinoJson
-    RTClib
-    Adafruit FRAM I2C
+Initial configuration (WiFi credentials, admin password, VPS token) is done via Captive Portal, not hardcoded in firmware.
+
+### Procedure
+
+1. **Enter provisioning mode** - Hold button (GPIO 8) for 5+ seconds during boot. Audio feedback (beep pattern on error signal pin) confirms detection.
+
+2. **Connect to AP** - ESP32 starts WiFi access point:
+   - SSID: `ESP32-WATER-SETUP`
+   - Password: `setup12345`
+   - IP: `192.168.4.1`
+
+3. **Configure** - Open browser, captive portal redirects to setup page. Enter:
+   - Device name (ID)
+   - WiFi SSID and password
+   - Admin password
+   - VPS auth token (optional)
+
+4. **Reboot** - ESP32 restarts in production mode, loads credentials from FRAM, connects to configured WiFi.
+
+Credentials are AES-256 encrypted before writing to FRAM. To reconfigure, repeat the provisioning procedure.
+
+## Troubleshooting
+
+| Symptom | Check |
+|---|---|
+| FRAM not detected | I2C wiring (SDA/SCL), FRAM power (3.3V), I2C address conflict |
+| WiFi not connecting | Re-run provisioning, verify SSID/password, check signal strength |
+| Web inaccessible | Verify your IP is in `ALLOWED_IPS` in `config.cpp`, check ESP32 got IP via serial monitor |
+| RTC battery warning | Replace CR2032 in DS3231 module. Warning persists until physical replacement (OSF flag) |
+| Auth fails after FRAM wipe | Re-run provisioning to program credentials. Without FRAM credentials all logins are blocked |
+| Pump runs but sensors don't confirm | Check float sensor wiring, verify sensor orientation, inspect tube for blockage |
+| ERROR state (LED pulsing) | 1 pulse = daily limit exceeded (resets midnight UTC). 2 pulses = pump failure after 3 retries. Reset via button or web |
+
+## Source Structure
+
 ```
-
-### Memory Layout
+src/
+  main.cpp                  Entry point, mode detection, main loop
+  algorithm/                Dosing state machine and cycle data structures
+  config/                   Settings, credentials manager, FRAM-backed storage
+  core/                     Logging utilities
+  crypto/                   AES-256 encryption for FRAM credentials
+  hardware/                 HAL: FRAM controller, pump, RTC, water sensors
+  network/                  WiFi manager, VPS logger
+  provisioning/             Captive portal: AP, web server, button detection
+  security/                 Auth manager, session manager, rate limiter
+  web/                      Production web server, API handlers, HTML pages
 ```
-FRAM Memory (32KB):
-0x0000-0x0017: Common validation area
-0x0018-0x0417: Encrypted credentials (1024 bytes)
-0x0500+:       ESP32 water system data
-```
-
-## 🤝 Contributing
-
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-### Development Setup
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Test in both Programming and Production modes
-4. Commit changes (`git commit -m 'Add amazing feature'`)
-5. Push to branch (`git push origin feature/amazing-feature`)
-6. Open Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 👥 Authors & Acknowledgments
-
-- **Primary Developer** - System architecture and algorithm development
-- **Security Integration** - FRAM programmer and dual-mode implementation
-- **Contributors** - See [Contributors](https://github.com/yourusername/esp32-water-system/contributors)
-
-### Special Thanks
-- Arduino/ESP32 community for excellent libraries
-- PlatformIO team for the development platform
-- Adafruit for hardware libraries and documentation
-- **FRAM programmer project** for encryption foundation
-
-## 📚 Documentation
-
-- [Hardware Assembly Guide](docs/hardware-setup.md) - **Updated for FRAM requirements**
-- [Algorithm Documentation](docs/algorithm-details.md)
-- [API Reference](docs/api-reference.md) - **Updated for dynamic credentials**
-- [Troubleshooting Guide](docs/troubleshooting.md)
-- **[Credential Management Guide](docs/credential-management.md)** - NEW!
-
-## 🔄 Changelog
-
-### v2.0.0 - Dual-Mode Security Update
-- ✅ **NEW**: Dual-mode operation (Programming/Production)
-- ✅ **NEW**: FRAM credential storage with AES-256 encryption
-- ✅ **NEW**: CLI programming interface
-- ✅ **NEW**: Dynamic credential loading
-- ✅ **SECURITY**: Mode isolation and conditional compilation
-- ✅ **ENHANCED**: Unified FRAM memory layout
-
-See [CHANGELOG.md](CHANGELOG.md) for complete version history.
-
-## 📞 Support
-
-- 🐛 **Bug Reports**: [Issues](https://github.com/yourusername/esp32-water-system/issues)
-- 💡 **Feature Requests**: [Discussions](https://github.com/yourusername/esp32-water-system/discussions)
-- 🔒 **Security Issues**: security@yourdomain.com
-- 📧 **General Contact**: your-email@domain.com
-
----
-
-⭐ **Star this repository if it helped you!** ⭐
-
-🔐 **Now featuring secure credential management for production deployments!** 🔐

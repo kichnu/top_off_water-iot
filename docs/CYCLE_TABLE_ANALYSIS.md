@@ -1,3 +1,4 @@
+
 # Analiza: Tabela historii cykli dolewania w GUI
 
 ## Planowana funkcjonalność

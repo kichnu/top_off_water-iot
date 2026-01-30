@@ -26,6 +26,12 @@ void handleDashboard(AsyncWebServerRequest* request) {
 }
 
 void handleLoginPage(AsyncWebServerRequest* request) {
+    IPAddress clientIP = request->client()->remoteIP();
+    if (!isTrustedProxyIP(clientIP) && !isIPAllowed(clientIP)) {
+        request->send(403, "text/plain", "Forbidden");
+        return;
+    }
+
     AsyncWebServerResponse* response = request->beginResponse_P(
         200, "text/html", (const uint8_t*)LOGIN_HTML, strlen(LOGIN_HTML));
     request->send(response);
@@ -33,7 +39,14 @@ void handleLoginPage(AsyncWebServerRequest* request) {
 
 void handleLogin(AsyncWebServerRequest* request) {
     IPAddress clientIP = request->client()->remoteIP();
-    
+
+    // Whitelist check - block login from unknown IPs
+    if (!isIPAllowed(clientIP)) {
+        LOG_WARNING("Login attempt from non-whitelisted IP: %s", clientIP.toString().c_str());
+        request->send(403, "application/json", "{\"success\":false,\"error\":\"Access denied\"}");
+        return;
+    }
+
     if (isRateLimited(clientIP) || isIPBlocked(clientIP)) {
         request->send(429, "text/plain", "Too Many Requests");
         return;
@@ -479,13 +492,18 @@ void handleGetStatistics(AsyncWebServerRequest* request) {
 // ========================================
 
 void handleGetDailyVolume(AsyncWebServerRequest* request) {
+    if (!checkAuthentication(request)) {
+        request->send(401, "application/json", "{\"success\":false,\"error\":\"Unauthorized\"}");
+        return;
+    }
+
     String response = "{";
     response += "\"success\":true,";
     response += "\"daily_volume\":" + String(waterAlgorithm.getDailyVolume()) + ",";
     response += "\"max_volume\":" + String(waterAlgorithm.getFillWaterMax()) + ",";
     response += "\"last_reset_utc_day\":" + String(waterAlgorithm.getLastResetUTCDay());
     response += "}";
-    
+
     request->send(200, "application/json", response);
 }
 
@@ -531,17 +549,27 @@ void handleResetDailyVolume(AsyncWebServerRequest* request) {
 // ===============================
 
 void handleGetAvailableVolume(AsyncWebServerRequest* request) {
+    if (!checkAuthentication(request)) {
+        request->send(401, "application/json", "{\"success\":false,\"error\":\"Unauthorized\"}");
+        return;
+    }
+
     String response = "{";
     response += "\"success\":true,";
     response += "\"max_ml\":" + String(waterAlgorithm.getAvailableVolumeMax()) + ",";
     response += "\"current_ml\":" + String(waterAlgorithm.getAvailableVolumeCurrent()) + ",";
     response += "\"is_empty\":" + String(waterAlgorithm.isAvailableVolumeEmpty() ? "true" : "false");
     response += "}";
-    
+
     request->send(200, "application/json", response);
 }
 
 void handleSetAvailableVolume(AsyncWebServerRequest* request) {
+    if (!checkAuthentication(request)) {
+        request->send(401, "application/json", "{\"success\":false,\"error\":\"Unauthorized\"}");
+        return;
+    }
+
     if (!request->hasParam("value", true)) {
         request->send(400, "application/json", "{\"success\":false,\"error\":\"Missing value parameter\"}");
         return;
@@ -566,6 +594,11 @@ void handleSetAvailableVolume(AsyncWebServerRequest* request) {
 }
 
 void handleRefillAvailableVolume(AsyncWebServerRequest* request) {
+    if (!checkAuthentication(request)) {
+        request->send(401, "application/json", "{\"success\":false,\"error\":\"Unauthorized\"}");
+        return;
+    }
+
     waterAlgorithm.refillAvailableVolume();
     
     String response = "{";
@@ -582,15 +615,25 @@ void handleRefillAvailableVolume(AsyncWebServerRequest* request) {
 // ===============================
 
 void handleGetFillWaterMax(AsyncWebServerRequest* request) {
+    if (!checkAuthentication(request)) {
+        request->send(401, "application/json", "{\"success\":false,\"error\":\"Unauthorized\"}");
+        return;
+    }
+
     String response = "{";
     response += "\"success\":true,";
     response += "\"fill_water_max\":" + String(waterAlgorithm.getFillWaterMax());
     response += "}";
-    
+
     request->send(200, "application/json", response);
 }
 
 void handleSetFillWaterMax(AsyncWebServerRequest* request) {
+    if (!checkAuthentication(request)) {
+        request->send(401, "application/json", "{\"success\":false,\"error\":\"Unauthorized\"}");
+        return;
+    }
+
     if (!request->hasParam("value", true)) {
         request->send(400, "application/json", "{\"success\":false,\"error\":\"Missing value parameter\"}");
         return;
