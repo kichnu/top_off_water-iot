@@ -144,6 +144,92 @@ const char SETUP_PAGE_HTML[] PROGMEM = R"rawliteral(
         .hidden {
             display: none;
         }
+
+        /* Modal System */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s ease;
+        }
+        .modal-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        .modal-box {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            padding: 24px;
+            max-width: 360px;
+            width: 90%;
+            transform: scale(0.9);
+            transition: transform 0.2s ease;
+        }
+        .modal-overlay.show .modal-box {
+            transform: scale(1);
+        }
+        .modal-icon {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 16px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-icon svg { width: 24px; height: 24px; }
+        .modal-icon.ok   { background: rgba(46, 125, 50, 0.1); }
+        .modal-icon.ok svg   { color: #2e7d32; }
+        .modal-icon.err  { background: rgba(211, 47, 47, 0.1); }
+        .modal-icon.err svg  { color: #d32f2f; }
+        .modal-icon.warn { background: rgba(255, 193, 7, 0.15); }
+        .modal-icon.warn svg { color: #f57f17; }
+        .modal-icon.info { background: rgba(102, 126, 234, 0.1); }
+        .modal-icon.info svg { color: #667eea; }
+        .modal-title {
+            font-size: 1rem;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        .modal-text {
+            font-size: 0.85rem;
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .modal-actions .btn {
+            flex: 1;
+            width: auto;
+            height: 42px;
+            padding: 0 16px;
+            font-size: 14px;
+            margin-bottom: 0;
+        }
+        .modal-actions .btn-secondary {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            color: #666;
+            margin-bottom: 0;
+        }
+        .modal-actions .btn-secondary:hover {
+            background: #e8e8e8;
+            color: #333;
+        }
         .wifi-list {
             max-height: 200px;
             overflow-y: auto;
@@ -279,8 +365,58 @@ const char SETUP_PAGE_HTML[] PROGMEM = R"rawliteral(
             ESP32-C3 Water System v1.0 | Provisioning Mode
         </div>
     </div>
-    
+
+    <!-- Modal -->
+    <div class="modal-overlay" id="alertModal">
+        <div class="modal-box">
+            <div class="modal-icon" id="alertIcon"></div>
+            <div class="modal-title" id="alertTitle"></div>
+            <div class="modal-text" id="alertText"></div>
+            <div class="modal-actions" id="alertActions"></div>
+        </div>
+    </div>
+
     <script>
+        // ============================================
+        // MODAL SYSTEM
+        // ============================================
+        const MODAL_ICONS = {
+            ok:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>',
+            err:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+            warn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+            info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
+        };
+
+        let alertCallback = null;
+
+        function showAlert(title, msg, type, cb) {
+            document.getElementById('alertIcon').className = 'modal-icon ' + type;
+            document.getElementById('alertIcon').innerHTML = MODAL_ICONS[type] || MODAL_ICONS.info;
+            document.getElementById('alertTitle').textContent = title;
+            document.getElementById('alertText').textContent = msg;
+            document.getElementById('alertActions').innerHTML =
+                '<button class="btn" onclick="closeAlert()">OK</button>';
+            alertCallback = cb || null;
+            document.getElementById('alertModal').classList.add('show');
+        }
+
+        function closeAlert(confirmed) {
+            document.getElementById('alertModal').classList.remove('show');
+            if (confirmed && alertCallback) alertCallback();
+            alertCallback = null;
+        }
+
+        document.addEventListener('click', function(e) {
+            if (e.target.id === 'alertModal') closeAlert();
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeAlert();
+        });
+
+        // ============================================
+        // WIFI SETUP
+        // ============================================
         let selectedSSID = '';
         
         async function scanNetworks() {
@@ -320,11 +456,11 @@ const char SETUP_PAGE_HTML[] PROGMEM = R"rawliteral(
                         wifiList.appendChild(item);
                     });
                 } else {
-                    alert('No networks found. Try scanning again.');
+                    showAlert('No Networks', 'No networks found. Try scanning again.', 'info');
                 }
             } catch (error) {
                 console.error('Scan error:', error);
-                alert('Failed to scan networks. Please try again.');
+                showAlert('Scan Failed', 'Failed to scan networks. Please try again.', 'err');
             }
             
             btn.disabled = false;
@@ -404,7 +540,7 @@ const char SETUP_PAGE_HTML[] PROGMEM = R"rawliteral(
             }
             
             if (hasErrors) {
-                alert('Please fix the errors in the form');
+                showAlert('Validation Error', 'Please fix the errors in the form.', 'warn');
                 return;
             }
             
@@ -431,37 +567,32 @@ const char SETUP_PAGE_HTML[] PROGMEM = R"rawliteral(
                 
                 if (result.success) {
                     // Success - show instructions
-                    alert('✓ Configuration Saved Successfully!\n\n' + 
-                          'Please restart the device:\n' +
-                          '1. Disconnect power\n' +
-                          '2. Wait 5 seconds\n' +
-                          '3. Reconnect power\n\n' +
-                          'Device will boot in production mode.');
-                    
-                    // Disable form
-                    document.getElementById('configForm').style.display = 'none';
-                    
-                    // Show success message
-                    const content = document.querySelector('.content');
-                    content.innerHTML = `
-                        <div style="text-align: center; padding: 40px;">
-                            <div style="font-size: 80px; margin-bottom: 20px;">✓</div>
-                            <h2 style="color: #2e7d32; margin-bottom: 20px;">Configuration Saved!</h2>
-                            <p style="color: #666; margin-bottom: 30px;">Please restart your device manually.</p>
-                            <div style="background: #f5f5f5; border-radius: 8px; padding: 20px; text-align: left;">
-                                <strong>Next Steps:</strong>
-                                <ol style="margin: 10px 0 0 20px;">
-                                    <li style="margin: 10px 0;">Disconnect power from device</li>
-                                    <li style="margin: 10px 0;">Wait 5 seconds</li>
-                                    <li style="margin: 10px 0;">Reconnect power</li>
-                                    <li style="margin: 10px 0;">Device will boot in production mode</li>
-                                </ol>
+                    showAlert('Configuration Saved!', 'Please restart the device: disconnect power, wait 5 seconds, then reconnect.', 'ok', function() {
+                        // Disable form
+                        document.getElementById('configForm').style.display = 'none';
+
+                        // Show success message
+                        const content = document.querySelector('.content');
+                        content.innerHTML = `
+                            <div style="text-align: center; padding: 40px;">
+                                <div style="font-size: 80px; margin-bottom: 20px;">✓</div>
+                                <h2 style="color: #2e7d32; margin-bottom: 20px;">Configuration Saved!</h2>
+                                <p style="color: #666; margin-bottom: 30px;">Please restart your device manually.</p>
+                                <div style="background: #f5f5f5; border-radius: 8px; padding: 20px; text-align: left;">
+                                    <strong>Next Steps:</strong>
+                                    <ol style="margin: 10px 0 0 20px;">
+                                        <li style="margin: 10px 0;">Disconnect power from device</li>
+                                        <li style="margin: 10px 0;">Wait 5 seconds</li>
+                                        <li style="margin: 10px 0;">Reconnect power</li>
+                                        <li style="margin: 10px 0;">Device will boot in production mode</li>
+                                    </ol>
+                                </div>
                             </div>
-                        </div>
-                    `;
+                        `;
+                    });
                 } else {
                     // Error from server
-                    alert('❌ Configuration Failed\n\n' + (result.error || 'Unknown error'));
+                    showAlert('Configuration Failed', result.error || 'Unknown error', 'err');
                     
                     // Re-enable button
                     submitBtn.disabled = false;
@@ -479,8 +610,7 @@ const char SETUP_PAGE_HTML[] PROGMEM = R"rawliteral(
                 }
             } catch (error) {
                 console.error('Submit error:', error);
-                alert('❌ Failed to save configuration\n\n' + 
-                      'Please check your connection and try again.');
+                showAlert('Connection Error', 'Failed to save configuration. Please check your connection and try again.', 'err');
                 
                 // Re-enable button
                 submitBtn.disabled = false;

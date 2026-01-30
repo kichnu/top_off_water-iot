@@ -883,6 +883,94 @@ const char* DASHBOARD_HTML = R"rawliteral(
         .ct-fail { color: var(--accent-red); font-weight: 600; }
         .ct-warn { color: var(--accent-yellow); }
         .ct-n { color: var(--text-primary); }
+
+        /* Modal System */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s ease;
+        }
+        .modal-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        .modal-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 24px;
+            max-width: 360px;
+            width: 90%;
+            transform: scale(0.9);
+            transition: transform 0.2s ease;
+        }
+        .modal-overlay.show .modal-box {
+            transform: scale(1);
+        }
+        .modal-icon {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 16px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-icon svg { width: 24px; height: 24px; }
+        .modal-icon.ok   { background: rgba(34, 197, 94, 0.15); }
+        .modal-icon.ok svg   { color: var(--accent-green); }
+        .modal-icon.err  { background: rgba(239, 68, 68, 0.15); }
+        .modal-icon.err svg  { color: var(--accent-red); }
+        .modal-icon.warn { background: rgba(234, 179, 8, 0.15); }
+        .modal-icon.warn svg { color: var(--accent-yellow); }
+        .modal-icon.info { background: rgba(56, 189, 248, 0.15); }
+        .modal-icon.info svg { color: var(--accent-blue); }
+        .modal-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+        .modal-text {
+            font-size: 0.7rem;
+            text-align: center;
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .modal-actions .btn {
+            flex: 1;
+            height: 40px;
+            padding: 0 16px;
+            border-radius: 6px;
+            font-size: 0.7rem;
+        }
+        .modal-actions .btn-primary {
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+            border: none;
+            color: var(--bg-primary);
+        }
+        .modal-actions .btn-primary:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(34, 211, 213, 0.3);
+        }
+        .modal-actions .btn-secondary:hover:not(:disabled) {
+            background: var(--bg-card-hover);
+            color: var(--text-primary);
+        }
     </style>
 </head>
 <body>
@@ -1108,7 +1196,66 @@ const char* DASHBOARD_HTML = R"rawliteral(
         </div>
     </div>
 
+    <!-- Modal -->
+    <div class="modal-overlay" id="alertModal">
+        <div class="modal-box">
+            <div class="modal-icon" id="alertIcon"></div>
+            <div class="modal-title" id="alertTitle"></div>
+            <div class="modal-text" id="alertText"></div>
+            <div class="modal-actions" id="alertActions"></div>
+        </div>
+    </div>
+
     <script>
+
+        // ============================================
+        // MODAL SYSTEM
+        // ============================================
+        const MODAL_ICONS = {
+            ok:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>',
+            err:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+            warn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+            info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
+        };
+
+        let alertCallback = null;
+
+        function showAlert(title, msg, type, cb) {
+            document.getElementById('alertIcon').className = 'modal-icon ' + type;
+            document.getElementById('alertIcon').innerHTML = MODAL_ICONS[type] || MODAL_ICONS.info;
+            document.getElementById('alertTitle').textContent = title;
+            document.getElementById('alertText').textContent = msg;
+            document.getElementById('alertActions').innerHTML =
+                '<button class="btn btn-primary" onclick="closeAlert()">OK</button>';
+            alertCallback = cb || null;
+            document.getElementById('alertModal').classList.add('show');
+        }
+
+        function showConfirm(title, msg, type, onConfirm) {
+            document.getElementById('alertIcon').className = 'modal-icon ' + type;
+            document.getElementById('alertIcon').innerHTML = MODAL_ICONS[type] || MODAL_ICONS.info;
+            document.getElementById('alertTitle').textContent = title;
+            document.getElementById('alertText').textContent = msg;
+            document.getElementById('alertActions').innerHTML =
+                '<button class="btn btn-secondary" onclick="closeAlert()">Cancel</button>' +
+                '<button class="btn btn-primary" onclick="closeAlert(true)">Confirm</button>';
+            alertCallback = onConfirm;
+            document.getElementById('alertModal').classList.add('show');
+        }
+
+        function closeAlert(confirmed) {
+            document.getElementById('alertModal').classList.remove('show');
+            if (confirmed && alertCallback) alertCallback();
+            alertCallback = null;
+        }
+
+        document.addEventListener('click', function(e) {
+            if (e.target.id === 'alertModal') closeAlert();
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeAlert();
+        });
 
         // ============================================
         // SESSION EXPIRY HANDLING (for VPS proxy)
@@ -1405,28 +1552,26 @@ const char* DASHBOARD_HTML = R"rawliteral(
                 return;
             }
 
-            if (!confirm("Change Volume per Second to " + volumeValue.toFixed(1) + " ml/s?")) {
-                return;
-            }
+            showConfirm("Change Setting?", "Change Volume per Second to " + volumeValue.toFixed(1) + " ml/s?", "info", function() {
+                statusSpan.textContent = "Updating...";
 
-            statusSpan.textContent = "Updating...";
+                const formData = new FormData();
+                formData.append("volume_per_second", volumeValue);
 
-            const formData = new FormData();
-            formData.append("volume_per_second", volumeValue);
-
-            fetch("api/pump-settings", { method: "POST", body: formData })
-                .then((response) => response.json())
-                .then((data) => {
-                    if (data.success) {
-                        statusSpan.textContent = "Current: " + volumeValue.toFixed(1) + " ml/s";
-                        showNotification("Volume updated to " + volumeValue.toFixed(1) + " ml/s", "success");
-                    } else {
-                        statusSpan.textContent = "Error: " + (data.error || "Update failed");
-                    }
-                })
-                .catch((error) => {
-                    statusSpan.textContent = "Network error";
-                });
+                fetch("api/pump-settings", { method: "POST", body: formData })
+                    .then((response) => response.json())
+                    .then((data) => {
+                        if (data.success) {
+                            statusSpan.textContent = "Current: " + volumeValue.toFixed(1) + " ml/s";
+                            showNotification("Volume updated to " + volumeValue.toFixed(1) + " ml/s", "success");
+                        } else {
+                            statusSpan.textContent = "Error: " + (data.error || "Update failed");
+                        }
+                    })
+                    .catch((error) => {
+                        statusSpan.textContent = "Network error";
+                    });
+            });
         }
 
         // ============================================
@@ -1613,27 +1758,27 @@ const char* DASHBOARD_HTML = R"rawliteral(
         }
 
         function resetDailyVolume() {
-            if (!confirm("Reset daily volume to 0ml?")) return;
+            showConfirm("Reset Volume?", "Reset daily volume to 0ml?", "warn", function() {
+                const btn = document.getElementById("resetDailyVolumeBtn");
+                btn.disabled = true;
+                btn.textContent = "Resetting...";
 
-            const btn = document.getElementById("resetDailyVolumeBtn");
-            btn.disabled = true;
-            btn.textContent = "Resetting...";
-
-            fetch("api/reset-daily-volume", { method: "POST" })
-                .then((response) => response.json())
-                .then((data) => {
-                    if (data.success) {
-                        showNotification("Daily volume reset", "success");
-                        loadDailyVolume();
-                    } else {
-                        showNotification("Failed: " + (data.error || "Unknown error"), "error");
-                    }
-                })
-                .catch(() => showNotification("Network error", "error"))
-                .finally(() => {
-                    btn.disabled = false;
-                    btn.textContent = "Reset Daily Volume";
-                });
+                fetch("api/reset-daily-volume", { method: "POST" })
+                    .then((response) => response.json())
+                    .then((data) => {
+                        if (data.success) {
+                            showNotification("Daily volume reset", "success");
+                            loadDailyVolume();
+                        } else {
+                            showNotification("Failed: " + (data.error || "Unknown error"), "error");
+                        }
+                    })
+                    .catch(() => showNotification("Network error", "error"))
+                    .finally(() => {
+                        btn.disabled = false;
+                        btn.textContent = "Reset Daily Volume";
+                    });
+            });
         }
 
 
@@ -1702,19 +1847,19 @@ const char* DASHBOARD_HTML = R"rawliteral(
         }
 
         function refillAvailableVolume() {
-            if (!confirm("Refill available volume to max?")) return;
-            
-            fetch("api/refill-available-volume", { method: "POST" })
-                .then((response) => response.json())
-                .then((data) => {
-                    if (data.success) {
-                        showNotification("Available volume refilled", "success");
-                        loadAvailableVolume();
-                    } else {
-                        showNotification("Failed: " + (data.error || "Unknown error"), "error");
-                    }
-                })
-                .catch(() => showNotification("Network error", "error"));
+            showConfirm("Refill Volume?", "Refill available volume to max?", "info", function() {
+                fetch("api/refill-available-volume", { method: "POST" })
+                    .then((response) => response.json())
+                    .then((data) => {
+                        if (data.success) {
+                            showNotification("Available volume refilled", "success");
+                            loadAvailableVolume();
+                        } else {
+                            showNotification("Failed: " + (data.error || "Unknown error"), "error");
+                        }
+                    })
+                    .catch(() => showNotification("Network error", "error"));
+            });
         }
 
         // ============================================
