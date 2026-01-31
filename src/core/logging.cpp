@@ -43,6 +43,6 @@ void logError(const char* format, ...) {
     va_start(args, format);
     vsnprintf(buffer, sizeof(buffer), format, args);
     va_end(args);
-    Serial.printf("[%lu] [ERROR] %s\n", millis(), buffer);
+    Serial.printf("[%lu] %s\n", millis(), buffer);
 #endif
 }

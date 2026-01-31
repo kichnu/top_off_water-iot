@@ -844,9 +844,9 @@ const char* DASHBOARD_HTML = R"rawliteral(
 
         /* Cycle History Table */
         .cycle-table-wrap {
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-            max-height: 420px;
+            // overflow-x: auto;
+            // -webkit-overflow-scrolling: touch;
+            // max-height: 420px;
             overflow-y: auto;
             margin-top: 12px;
         }

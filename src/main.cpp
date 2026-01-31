@@ -23,71 +23,64 @@ void setup() {
     // Initialize core systems
     initLogging();
     delay(5000); // Wait for serial monitor
-    
-    Serial.println();
-    Serial.println("=== ESP32-C3 Water System Starting ===");
-    Serial.println("Single Mode - Captive Portal Provisioning");
-    
-    // Check ESP32 resources
-    Serial.print("ESP32 Flash size: ");
-    Serial.print(ESP.getFlashChipSize());
-    Serial.println(" bytes");
-    Serial.print("Free heap: ");
-    Serial.print(ESP.getFreeHeap());
-    Serial.println(" bytes");
 
-    Serial.println();
-    Serial.println("=== CHECKING PROVISIONING BUTTON ===");
-    
+    LOG_INFO("");
+    LOG_INFO("====================================");
+    LOG_INFO("=== ESP32-C3 Water System Starting ===");
+    LOG_INFO("Single Mode - Captive Portal Provisioning");
+    LOG_INFO("ESP32 Flash size: %d", ESP.getFlashChipSize());
+    LOG_INFO("Free heap: %d", ESP.getFreeHeap());
+    LOG_INFO("CHECKING PROVISIONING BUTTON");
+
     // Check if provisioning button is held
     if (checkProvisioningButton()) {
-        Serial.println();
-        Serial.println("╔════════════════════════════════════════╗");
-        Serial.println("║    ENTERING PROVISIONING MODE          ║");
-        Serial.println("╚════════════════════════════════════════╝");
-        Serial.println();
-
-        Serial.println("Initializing FRAM for credential storage...");
+        LOG_INFO("");
+        LOG_INFO("====================================");
+        LOG_INFO("    ENTERING PROVISIONING MODE");
+        LOG_INFO("====================================");
+        LOG_INFO("Initializing FRAM for credential storage");
+     
         if (!initFRAM()) {
-            Serial.println("WARNING: FRAM initialization failed!");
-            Serial.println("Credentials may not be saved properly.");
+            LOG_INFO("WARNING: FRAM initialization failed!");
+            LOG_INFO("Credentials may not be saved properly");
             delay(2000);
         } else {
-            Serial.println("✓ FRAM ready");
+            LOG_INFO("");
+            LOG_INFO("FRAM ready");
         }
-        Serial.println();
-        
-        // Start Access Point
+
         if (!startAccessPoint()) {
-            Serial.println("FATAL: Failed to start AP - halting");
+            LOG_INFO("");
+            LOG_INFO("FATAL: Failed to start AP - halting");
             while(1) delay(1000);
         }
         
         // Start DNS Server for captive portal
         if (!startDNSServer()) {
-            Serial.println("FATAL: Failed to start DNS - halting");
+            LOG_INFO("");
+            LOG_INFO("FATAL: Failed to start DNS - halting");
             while(1) delay(1000);
         }
         
-        Serial.println();
-        Serial.println("=== PROVISIONING MODE ACTIVE ===");
-        Serial.println("Connect to WiFi network:");
-        Serial.println("  SSID: ESP32-WATER-SETUP");
-        Serial.println("  Password: setup12345");
-        Serial.print("  URL: http://");
-        Serial.println(getAPIPAddress().toString());
-        Serial.println();
-        
+        LOG_INFO("");
+        LOG_INFO("====================================");
+        LOG_INFO("=== PROVISIONING MODE ACTIVE ===");
+        LOG_INFO("Connect to WiFi network:");
+        LOG_INFO("SSID: ESP32-WATER-SETUP");
+        LOG_INFO("Password: setup12345");
+        LOG_INFO("URL: http://");
+        LOG_INFO("%s", getAPIPAddress().toString());
+
         // Start Web Server
         if (!startWebServer()) {
             Serial.println("FATAL: Failed to start web server - halting");
             while(1) delay(1000);
         }
         
-        Serial.println("=== CAPTIVE PORTAL READY ===");
-        Serial.println("Open a browser or wait for captive portal popup");
-        Serial.println();
-        
+        LOG_INFO("");
+        LOG_INFO("=== CAPTIVE PORTAL READY ===");
+        LOG_INFO("Open a browser or wait for captive portal popup");
+  
         // Enter blocking loop - never returns
         runProvisioningLoop();
         
@@ -95,8 +88,8 @@ void setup() {
     }
     
     // === PRODUCTION MODE SETUP ===
-    Serial.println();
-    Serial.println("=== Production Mode - Full Water System ===");
+    LOG_INFO("");
+    LOG_INFO("=== Production Mode - Full Water System ===");
 
     initWaterSensors();
     initPumpController();
@@ -106,30 +99,30 @@ void setup() {
     waterAlgorithm.initFromFRAM();
 
     bool credentials_loaded = initCredentialsManager();
-    
-    Serial.print("Device ID: ");
+    LOG_INFO("");
     if (credentials_loaded) {
-        Serial.println(getDeviceID());
+        LOG_INFO("Device ID: %s", getDeviceID());
     } else {
-        Serial.println("FALLBACK_MODE");
+        LOG_INFO("FALLBACK_MODE");
     }
-    
-    Serial.println("[INIT] Initializing network...");
     initWiFi();
-
-    LOG_INFO("[INIT] Initializing RTC...");
     initializeRTC();
-    LOG_INFO("RTC Status: %s", getRTCInfo().c_str());
-    
-    LOG_INFO("[INIT] Waiting for RTC to stabilize...");
     delay(2000);
+
+    LOG_INFO("");
+    LOG_INFO("====================================");
+    LOG_INFO("Initializing network...");
+    LOG_INFO("[INIT] Initializing RTC...");
+    LOG_INFO("RTC Status: %s", getRTCInfo().c_str());
+    LOG_INFO("[INIT] Waiting for RTC to stabilize...");
+    LOG_INFO("====================================");
     
     if (!isRTCWorking()) {
         LOG_WARNING("⚠️ WARNING: RTC not working properly");
         LOG_WARNING("⚠️ Daily volume tracking may be affected");
+        LOG_WARNING("");
     }
-    
-    LOG_INFO("[INIT] Initializing daily volume tracking...");
+    LOG_INFO("Initializing daily volume tracking...");
     waterAlgorithm.initDailyVolume();
 
     // Initialize security
@@ -145,9 +138,9 @@ void setup() {
     
     // Post-init diagnostics
     Serial.println();
+    LOG_INFO("");
     LOG_INFO("====================================");
     LOG_INFO("SYSTEM POST-INIT STATUS");
-    LOG_INFO("====================================");
     LOG_INFO("RTC Working: %s", isRTCWorking() ? "YES" : "NO");
     LOG_INFO("RTC Info: %s", getRTCInfo().c_str());
     LOG_INFO("Current Time: %s", getCurrentTimestamp().c_str());
@@ -156,16 +149,14 @@ void setup() {
     LOG_INFO("  Daily Volume: %d / %d ml", 
              waterAlgorithm.getDailyVolume(), FILL_WATER_MAX);
     LOG_INFO("  UTC Day: %lu", waterAlgorithm.getLastResetUTCDay());
-    LOG_INFO("====================================");
-    Serial.println();
     
-    Serial.println("=== System initialization complete ===");
     if (isWiFiConnected()) {
-        Serial.print("Dashboard: http://");
-        Serial.println(getLocalIP().toString());
+        LOG_INFO("Dashboard: http://");
+        LOG_INFO("%s", getLocalIP().toString());
     }
-    Serial.print("Current time: ");
-    Serial.println(getCurrentTimestamp());
+    LOG_INFO("Current Time: %s", getCurrentTimestamp().c_str());
+    LOG_INFO("=== System initialization complete ===");
+    LOG_INFO("====================================");
 }
 
 void loop() {
@@ -213,7 +204,8 @@ void loop() {
             currentPumpSettings.autoModeEnabled && 
             shouldActivatePump() && 
             !isPumpActive()) {
-            Serial.println("Auto pump triggered - water level low");
+            LOG_INFO("");
+            LOG_INFO("Auto pump triggered - water level low");    
             triggerPump(currentPumpSettings.manualCycleSeconds, "AUTO_PUMP");
         }
         

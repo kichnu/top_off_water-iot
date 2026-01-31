@@ -73,18 +73,21 @@ void setSystemState(bool enabled) {
         systemDisabledTime = 0;
         LOG_INFO("====================================");
         LOG_INFO("SYSTEM ENABLED");
-        LOG_INFO("====================================");
         LOG_INFO("Algorithm will resume operation");
         LOG_INFO("Sensors will be checked on next update");
+        LOG_INFO("====================================");
+        LOG_INFO("");
+
     } else {
         // Disabling system
         systemDisabled = true;
         systemDisabledTime = millis();
         LOG_INFO("====================================");
         LOG_INFO("SYSTEM DISABLED");
-        LOG_INFO("====================================");
         LOG_INFO("Auto-enable in 30 minutes");
         LOG_INFO("Algorithm will pause at safe point");
+        LOG_INFO("====================================");
+        LOG_INFO("");
     }
 }
 
@@ -93,7 +96,6 @@ void checkSystemAutoEnable() {
         if (millis() - systemDisabledTime >= SYSTEM_AUTO_ENABLE_MS) {
             LOG_INFO("====================================");
             LOG_INFO("SYSTEM AUTO-ENABLE TRIGGERED");
-            LOG_INFO("====================================");
             LOG_INFO("30 minutes elapsed - re-enabling system");
             
             systemDisabled = false;
@@ -101,6 +103,7 @@ void checkSystemAutoEnable() {
             
             LOG_INFO("System state: ENABLED");
             LOG_INFO("====================================");
+            LOG_INFO("");
         }
     }
 }
@@ -117,6 +120,7 @@ void checkPumpAutoEnable() {
             pumpGlobalEnabled = true;
             pumpDisabledTime = 0;
             LOG_INFO("Pump auto-enabled after 30 minutes");
+            LOG_INFO("");
         }
     }
 }
@@ -126,8 +130,10 @@ void setPumpGlobalState(bool enabled) {
     if (!enabled) {
         pumpDisabledTime = millis();
         LOG_INFO("Pump globally disabled for 30 minutes");
+        LOG_INFO("");
     } else {
         pumpDisabledTime = 0;
         LOG_INFO("Pump globally enabled");
+        LOG_INFO("");
     }
 }

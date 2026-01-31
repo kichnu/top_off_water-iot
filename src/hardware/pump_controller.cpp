@@ -25,6 +25,7 @@ void initPumpController() {
     digitalWrite(PUMP_RELAY_PIN, HIGH);
     
     pumpRunning = false;
+    LOG_INFO("");
     LOG_INFO("Pump controller initialized");
 }
 
@@ -34,6 +35,7 @@ void updatePumpController() {
     if (!pumpGlobalEnabled && pumpRunning) {
         digitalWrite(PUMP_RELAY_PIN, HIGH);
         pumpRunning = false;
+        LOG_INFO("");
         LOG_INFO("Pump stopped - globally disabled");
         return;
     }
@@ -47,14 +49,17 @@ void updatePumpController() {
         // uint16_t volumeML = actualDuration * currentPumpSettings.volumePerSecond;
         uint16_t volumeML = (uint16_t)round(actualDuration * currentPumpSettings.volumePerSecond);
         
+        LOG_INFO("");
         LOG_INFO("Pump stopped after %d seconds, estimated volume: %d ml", 
                  actualDuration, volumeML);
 
         if (currentActionType == "MANUAL_NORMAL") {
             // Access water algorithm to update daily volume
             waterAlgorithm.addManualVolume(volumeML);
+            LOG_INFO("");
             LOG_INFO("✅ MANUAL_NORMAL volume added to daily total: %dml", volumeML);
         } else if (currentActionType == "MANUAL_EXTENDED") {
+            LOG_INFO("");
             LOG_INFO("ℹ️ MANUAL_EXTENDED (calibration) - NOT added to daily volume");
         }
 
@@ -76,14 +81,17 @@ void updatePumpController() {
 }
 
 bool triggerPump(uint16_t durationSeconds, const String& actionType) {
+    LOG_INFO("");
     LOG_INFO("triggerPump called: %s for %ds", actionType.c_str(), durationSeconds);
     
     if (pumpRunning) {
+        LOG_WARNING("");
         LOG_WARNING("Pump already running, ignoring trigger");
         return false;
     }
 
     if (!pumpGlobalEnabled) {
+        LOG_INFO("");
         LOG_INFO("Pump trigger blocked - globally disabled");
         return false;
     }
@@ -91,6 +99,7 @@ bool triggerPump(uint16_t durationSeconds, const String& actionType) {
     // TYLKO dla manual pump notify algorithm
     if (actionType.startsWith("MANUAL")) {
         if (!waterAlgorithm.requestManualPump(durationSeconds * 1000)) {
+            LOG_WARNING("");
             LOG_WARNING("Algorithm rejected manual pump request");
             return false;
         }
@@ -103,6 +112,7 @@ bool triggerPump(uint16_t durationSeconds, const String& actionType) {
     pumpDuration = durationSeconds * 1000UL;
     currentActionType = actionType;
     
+    LOG_INFO("");
     LOG_INFO("Pump started: %s for %d seconds", actionType.c_str(), durationSeconds);
     return true;
 }
@@ -120,14 +130,6 @@ uint32_t getPumpRemainingTime() {
     return (pumpDuration - elapsed) / 1000;
 }
 
-// void stopPump() {
-//     if (pumpRunning) {
-//         digitalWrite(PUMP_RELAY_PIN, HIGH);
-//         pumpRunning = false;
-//         LOG_INFO("Pump manually stopped");
-//     }
-// }
-
 void stopPump() {
     if (pumpRunning) {
         digitalWrite(PUMP_RELAY_PIN, HIGH);
@@ -137,23 +139,20 @@ void stopPump() {
         uint16_t actualDuration = (millis() - pumpStartTime) / 1000;
         uint16_t volumeML = (uint16_t)round(actualDuration * currentPumpSettings.volumePerSecond);
         
+        LOG_INFO("");
         LOG_INFO("Pump manually stopped after %d seconds, estimated volume: %d ml", 
                  actualDuration, volumeML);
         
         // Update available volume for manual pump
         if (currentActionType == "MANUAL_NORMAL") {
             waterAlgorithm.addManualVolume(volumeML);
+            LOG_INFO("");
             LOG_INFO("MANUAL_NORMAL stopped early: %dml (available volume updated)", volumeML);
         } else if (currentActionType == "MANUAL_EXTENDED") {
+            LOG_INFO("");
             LOG_INFO("MANUAL_EXTENDED (calibration) stopped - NOT added to volume");
         }
-        
-        // // Log to VPS for non-AUTO actions
-        // if (!currentActionType.startsWith("AUTO") && actualDuration > 0) {
-        //     uint32_t unixTime = getUnixTimestamp();
-        //     logEventToVPS(currentActionType, volumeML, unixTime);
-        // }
-        
+    
         currentActionType = "";
     }
 }

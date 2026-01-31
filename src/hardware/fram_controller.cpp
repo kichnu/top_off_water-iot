@@ -26,21 +26,25 @@ uint16_t calculateChecksum(uint8_t* data, size_t len) {
 }
 
 bool initFRAM() {
+    LOG_INFO("");
     LOG_INFO("Initializing FRAM at address 0x50...");
     
     // FRAM uses same I2C as RTC - already initialized in rtc_controller
     // Just begin FRAM communication
     if (!fram.begin(0x50)) {
+        LOG_ERROR("");
         LOG_ERROR("FRAM not found at address 0x50!");
         framInitialized = false;
         return false;
     }
     
     framInitialized = true;
+    LOG_INFO("");
     LOG_INFO("FRAM initialized successfully (256Kbit = 32KB)");
     
     // Verify FRAM integrity
     if (!verifyFRAM()) {
+        LOG_WARNING("");
         LOG_WARNING("FRAM not initialized or corrupted, initializing...");
         
         // Write magic number
@@ -61,6 +65,7 @@ bool initFRAM() {
         uint16_t checksum = calculateChecksum(buffer, 4);
         fram.write(FRAM_ADDR_CHECKSUM, (uint8_t*)&checksum, 2);
         
+        LOG_INFO("");
         LOG_INFO("FRAM initialized with defaults");
     }
 
@@ -89,6 +94,7 @@ bool verifyFRAM() {
     fram.read(FRAM_ADDR_MAGIC, (uint8_t*)&magic, 4);
     
     if (magic != FRAM_MAGIC_NUMBER) {
+        LOG_WARNING("");
         LOG_WARNING("FRAM magic number mismatch: 0x%08X", magic);
         return false;
     }
@@ -114,7 +120,8 @@ bool verifyFRAM() {
             // Update version
             uint16_t newVersion = FRAM_DATA_VERSION;
             fram.write(FRAM_ADDR_VERSION, (uint8_t*)&newVersion, 2);
-                
+            
+            LOG_INFO("");
             LOG_INFO("FRAM upgraded to version %d", FRAM_DATA_VERSION);
             return true;
         }
@@ -131,17 +138,19 @@ bool verifyFRAM() {
     fram.read(FRAM_ADDR_CHECKSUM, (uint8_t*)&storedChecksum, 2);
     
     if (calculatedChecksum != storedChecksum) {
+        LOG_WARNING("");
         LOG_WARNING("ESP32 data checksum mismatch: stored=%d, calculated=%d", 
                     storedChecksum, calculatedChecksum);
         return false;
     }
-    
+    LOG_INFO("");
     LOG_INFO("FRAM verification successful (unified layout v%d)", FRAM_DATA_VERSION);
     return true;
 }
 
 bool loadVolumeFromFRAM(float& volume) {
     if (!framInitialized) {
+        LOG_ERROR("");
         LOG_ERROR("FRAM not initialized, cannot load volume");
         return false;
     }
@@ -158,29 +167,33 @@ bool loadVolumeFromFRAM(float& volume) {
     fram.read(FRAM_ADDR_CHECKSUM, (uint8_t*)&storedChecksum, 2);
     
     if (calculatedChecksum != storedChecksum) {
+        LOG_ERROR("");
         LOG_ERROR("FRAM checksum error when loading volume!");
         return false;
     }
     
     // Sanity check the value
     if (volume < 0.1 || volume > 20.0) {
+        LOG_WARNING("");
         LOG_WARNING("FRAM volume out of range: %.2f, using default", volume);
         volume = 1.0;
         return false;
     }
-    
+    LOG_INFO("");
     LOG_INFO("Loaded volume from FRAM: %.1f ml/s", volume);
     return true;
 }
 
 bool saveVolumeToFRAM(float volume) {
     if (!framInitialized) {
+        LOG_ERROR("");
         LOG_ERROR("FRAM not initialized, cannot save volume");
         return false;
     }
     
     // Sanity check
     if (volume < 0.1 || volume > 20.0) {
+        LOG_ERROR("");
         LOG_ERROR("Invalid volume value: %.2f", volume);
         return false;
     }
@@ -199,21 +212,23 @@ bool saveVolumeToFRAM(float volume) {
     fram.read(FRAM_ADDR_VOLUME_ML, (uint8_t*)&readBack, 4);
     
     if (abs(readBack - volume) > 0.01) {
+        LOG_ERROR("");
         LOG_ERROR("FRAM write verification failed! Wrote: %.2f, Read: %.2f", 
                   volume, readBack);
         return false;
     }
-    
+    LOG_INFO("");
     LOG_INFO("SUCCESS: Saved volume to FRAM: %.1f ml/s", volume);
     return true;
 }
 
 void testFRAM() {
     if (!framInitialized) {
+        LOG_ERROR("");
         LOG_ERROR("FRAM not initialized for testing");
         return;
     }
-    
+    LOG_INFO("");
     LOG_INFO("=== FRAM Test Start ===");
     
     // Test 1: Write/Read test pattern
@@ -227,6 +242,7 @@ void testFRAM() {
     bool testPassed = true;
     for (int i = 0; i < 16; i++) {
         if (testData[i] != readData[i]) {
+            LOG_ERROR("");
             LOG_ERROR("FRAM test failed at byte %d: wrote 0x%02X, read 0x%02X", 
                      i, testData[i], readData[i]);
             testPassed = false;
@@ -234,6 +250,7 @@ void testFRAM() {
     }
     
     if (testPassed) {
+        LOG_INFO("");
         LOG_INFO("FRAM read/write test PASSED");
     }
     
@@ -243,8 +260,10 @@ void testFRAM() {
         float loadedVolume = 0;
         if (loadVolumeFromFRAM(loadedVolume)) {
             if (abs(loadedVolume - testVolume) < 0.01) {
+                LOG_INFO("");
                 LOG_INFO("FRAM volume persistence test PASSED");
             } else {
+                LOG_ERROR("");
                 LOG_ERROR("FRAM volume mismatch: saved %.2f, loaded %.2f", 
                          testVolume, loadedVolume);
             }
@@ -253,12 +272,13 @@ void testFRAM() {
     
     // Restore default volume
     saveVolumeToFRAM(1.0);
-    
+    LOG_INFO("");
     LOG_INFO("=== FRAM Test Complete ===");
 }
 
 bool saveCycleToFRAM(const PumpCycle& cycle) {
     if (!framInitialized) {
+        LOG_ERROR("");
         LOG_ERROR("FRAM not initialized for cycle save");
         return false;
     }
@@ -285,7 +305,7 @@ bool saveCycleToFRAM(const PumpCycle& cycle) {
         cycleCount++;
         fram.write(FRAM_ADDR_CYCLE_COUNT, (uint8_t*)&cycleCount, 2);
     }
-    
+    LOG_INFO("");
     LOG_INFO("Cycle saved to FRAM at index %d (total: %d)", 
              (writeIndex - 1 + FRAM_MAX_CYCLES) % FRAM_MAX_CYCLES, cycleCount);
     
@@ -294,6 +314,7 @@ bool saveCycleToFRAM(const PumpCycle& cycle) {
 
 bool loadCyclesFromFRAM(std::vector<PumpCycle>& cycles, uint16_t maxCount) {
     if (!framInitialized) {
+        LOG_ERROR("");
         LOG_ERROR("FRAM not initialized for cycle load");
         return false;
     }
@@ -308,6 +329,7 @@ bool loadCyclesFromFRAM(std::vector<PumpCycle>& cycles, uint16_t maxCount) {
     fram.read(FRAM_ADDR_CYCLE_INDEX, (uint8_t*)&writeIndex, 2);
     
     if (cycleCount == 0) {
+        LOG_INFO("");
         LOG_INFO("No cycles found in FRAM");
         return true;
     }
@@ -338,7 +360,7 @@ bool loadCyclesFromFRAM(std::vector<PumpCycle>& cycles, uint16_t maxCount) {
             cycles.push_back(cycle);
         }
     }
-    
+    LOG_INFO("");
     LOG_INFO("Loaded %d cycles from FRAM (requested: %d, available: %d)", 
              cycles.size(), loadCount, cycleCount);
     
@@ -369,6 +391,7 @@ uint16_t calculateStatsChecksum(const ErrorStats& stats) {
 
 bool loadErrorStatsFromFRAM(ErrorStats& stats) {
     if (!framInitialized) {
+        LOG_ERROR("");
         LOG_ERROR("FRAM not initialized for stats load");
         return false;
     }
@@ -385,6 +408,7 @@ bool loadErrorStatsFromFRAM(ErrorStats& stats) {
     fram.read(FRAM_ADDR_STATS_CHKSUM, (uint8_t*)&storedChecksum, 2);
     
     if (calculatedChecksum != storedChecksum) {
+        LOG_WARNING("");
         LOG_WARNING("Stats checksum mismatch: stored=%d, calculated=%d", 
                     storedChecksum, calculatedChecksum);
         
@@ -397,7 +421,7 @@ bool loadErrorStatsFromFRAM(ErrorStats& stats) {
         saveErrorStatsToFRAM(stats); // Save defaults
         return false;
     }
-    
+    LOG_INFO("");
     LOG_INFO("Loaded error stats: GAP1=%d, GAP2=%d, WATER=%d", 
              stats.gap1_fail_sum, stats.gap2_fail_sum, stats.water_fail_sum);
     
@@ -406,6 +430,7 @@ bool loadErrorStatsFromFRAM(ErrorStats& stats) {
 
 bool saveErrorStatsToFRAM(const ErrorStats& stats) {
     if (!framInitialized) {
+        LOG_ERROR("");
         LOG_ERROR("FRAM not initialized for stats save");
         return false;
     }
@@ -429,11 +454,12 @@ bool saveErrorStatsToFRAM(const ErrorStats& stats) {
     if (readBack.gap1_fail_sum != stats.gap1_fail_sum ||
         readBack.gap2_fail_sum != stats.gap2_fail_sum ||
         readBack.water_fail_sum != stats.water_fail_sum) {
-        
+        LOG_ERROR("");
         LOG_ERROR("FRAM stats write verification failed!");
         return false;
     }
     
+    LOG_INFO("");
     LOG_INFO("Saved error stats to FRAM: GAP1=%d, GAP2=%d, WATER=%d", 
              stats.gap1_fail_sum, stats.gap2_fail_sum, stats.water_fail_sum);
     
@@ -442,6 +468,7 @@ bool saveErrorStatsToFRAM(const ErrorStats& stats) {
 
 bool resetErrorStatsInFRAM() {
     if (!framInitialized) {
+        LOG_ERROR("");
         LOG_ERROR("FRAM not initialized for stats reset");
         return false;
     }
@@ -454,6 +481,7 @@ bool resetErrorStatsInFRAM() {
     
     bool success = saveErrorStatsToFRAM(stats);
     if (success) {
+        LOG_INFO("");
         LOG_INFO("Error statistics reset to zero");
     }
     
@@ -462,6 +490,7 @@ bool resetErrorStatsInFRAM() {
 
 bool incrementErrorStats(uint8_t gap1_increment, uint8_t gap2_increment, uint8_t water_increment) {
     if (!framInitialized) {
+        LOG_ERROR("");
         LOG_ERROR("FRAM not initialized for stats increment");
         return false;
     }
@@ -481,6 +510,7 @@ bool incrementErrorStats(uint8_t gap1_increment, uint8_t gap2_increment, uint8_t
         stats.gap1_fail_sum += gap1_increment;
     } else {
         stats.gap1_fail_sum = 65535; // Cap at max uint16_t
+        LOG_WARNING("");
         LOG_WARNING("GAP1 sum capped at 65535");
     }
     
@@ -488,6 +518,7 @@ bool incrementErrorStats(uint8_t gap1_increment, uint8_t gap2_increment, uint8_t
         stats.gap2_fail_sum += gap2_increment;
     } else {
         stats.gap2_fail_sum = 65535;
+        LOG_WARNING("");
         LOG_WARNING("GAP2 sum capped at 65535");
     }
     
@@ -495,6 +526,7 @@ bool incrementErrorStats(uint8_t gap1_increment, uint8_t gap2_increment, uint8_t
         stats.water_fail_sum += water_increment;
     } else {
         stats.water_fail_sum = 65535;
+        LOG_WARNING("");
         LOG_WARNING("WATER sum capped at 65535");
     }
     
@@ -502,6 +534,7 @@ bool incrementErrorStats(uint8_t gap1_increment, uint8_t gap2_increment, uint8_t
     bool success = saveErrorStatsToFRAM(stats);
     
     if (success && (gap1_increment || gap2_increment || water_increment)) {
+        LOG_INFO("");
         LOG_INFO("Incremented stats: GAP1+%d=%d, GAP2+%d=%d, WATER+%d=%d", 
                 gap1_increment, stats.gap1_fail_sum,
                 gap2_increment, stats.gap2_fail_sum, 
@@ -517,19 +550,21 @@ bool incrementErrorStats(uint8_t gap1_increment, uint8_t gap2_increment, uint8_t
 // ===============================
 bool readCredentialsFromFRAM(FRAMCredentials& creds) {
     if (!framInitialized) {
+        LOG_ERROR("");
         LOG_ERROR("FRAM not initialized for credentials read");
         return false;
     }
     
     // Read credentials structure from FRAM
     fram.read(FRAM_CREDENTIALS_ADDR, (uint8_t*)&creds, sizeof(FRAMCredentials));
-    
+    LOG_INFO("");
     LOG_INFO("Read credentials from FRAM at address 0x%04X", FRAM_CREDENTIALS_ADDR);
     return true;
 }
 
 bool writeCredentialsToFRAM(const FRAMCredentials& creds) {
     if (!framInitialized) {
+        LOG_ERROR("");
         LOG_ERROR("FRAM not initialized for credentials write");
         return false;
     }
@@ -543,16 +578,18 @@ bool writeCredentialsToFRAM(const FRAMCredentials& creds) {
     
     // Compare written data
     if (memcmp(&creds, &verify_creds, sizeof(FRAMCredentials)) != 0) {
+        LOG_ERROR("");
         LOG_ERROR("FRAM credentials write verification failed!");
         return false;
     }
-    
+    LOG_INFO("");
     LOG_INFO("Credentials written to FRAM at address 0x%04X", FRAM_CREDENTIALS_ADDR);
     return true;
 }
 
 bool verifyCredentialsInFRAM() {
     if (!framInitialized) {
+        LOG_ERROR("");
         LOG_ERROR("FRAM not initialized for credentials verify");
         return false;
     }
@@ -564,12 +601,14 @@ bool verifyCredentialsInFRAM() {
     
     // Check magic number
     if (creds.magic != FRAM_MAGIC_NUMBER) {
+        LOG_WARNING("");
         LOG_WARNING("Invalid credentials magic number: 0x%08X", creds.magic);
         return false;
     }
     
     // 🔄 UPDATED: Check version (accept v1, v2, and v3)
     if (creds.version != 0x0001 && creds.version != 0x0002 && creds.version != 0x0003) {
+        LOG_WARNING("");
         LOG_WARNING("Invalid credentials version: %d", creds.version);
         return false;
     }
@@ -579,11 +618,12 @@ bool verifyCredentialsInFRAM() {
     uint16_t calculated_checksum = calculateChecksum((uint8_t*)&creds, checksum_offset);
     
     if (creds.checksum != calculated_checksum) {
+        LOG_WARNING("");
         LOG_WARNING("Credentials checksum mismatch: stored=%d, calculated=%d", 
                     creds.checksum, calculated_checksum);
         return false;
     }
-    
+    LOG_INFO("");
     LOG_INFO("Credentials verification successful (version %d)", creds.version);
     return true;
 }
@@ -603,11 +643,13 @@ uint16_t calculateDailyVolumeChecksum(const DailyVolumeData& data) {
 
 bool saveDailyVolumeToFRAM(uint16_t dailyVolume, uint32_t utcDay) {
     if (!framInitialized) {
+        LOG_ERROR("");
         LOG_ERROR("FRAM not initialized for daily volume save");
         return false;
     }
     
     if (dailyVolume > 10000) {
+        LOG_ERROR("");
         LOG_ERROR("Invalid daily volume: %d (max 10000ml)", dailyVolume);
         return false;
     }
@@ -632,16 +674,18 @@ bool saveDailyVolumeToFRAM(uint16_t dailyVolume, uint32_t utcDay) {
     fram.read(FRAM_ADDR_LAST_RESET_UTC, (uint8_t*)&verify.last_reset_utc_day, 4);
     
     if (verify.volume_ml != dailyVolume || verify.last_reset_utc_day != utcDay) {
+        LOG_ERROR("");
         LOG_ERROR("FRAM daily volume write verification failed!");
         return false;
     }
-    
+    LOG_INFO("");
     LOG_INFO("✅ Daily volume saved to FRAM: %dml (UTC day: %lu)", dailyVolume, utcDay);
     return true;
 }
 
 bool loadDailyVolumeFromFRAM(uint16_t& dailyVolume, uint32_t& utcDay) {
     if (!framInitialized) {
+        LOG_ERROR("");
         LOG_ERROR("FRAM not initialized for daily volume load");
         return false;
     }
@@ -656,6 +700,7 @@ bool loadDailyVolumeFromFRAM(uint16_t& dailyVolume, uint32_t& utcDay) {
     fram.read(FRAM_ADDR_DAILY_CHECKSUM, (uint8_t*)&storedChecksum, 2);
     
     if (calculatedChecksum != storedChecksum) {
+        LOG_WARNING("");
         LOG_WARNING("Daily volume checksum mismatch: stored=%d, calculated=%d", 
                     storedChecksum, calculatedChecksum);
         return false;
@@ -663,13 +708,14 @@ bool loadDailyVolumeFromFRAM(uint16_t& dailyVolume, uint32_t& utcDay) {
     
     // Sanity check
     if (data.volume_ml > 10000) {
+        LOG_WARNING("");
         LOG_WARNING("FRAM daily volume out of range: %d", data.volume_ml);
         return false;
     }
     
     dailyVolume = data.volume_ml;
     utcDay = data.last_reset_utc_day;
-    
+    LOG_INFO("");
     LOG_INFO("✅ Daily volume loaded from FRAM: %dml (UTC day: %lu)", 
              dailyVolume, utcDay);
     
@@ -691,12 +737,14 @@ uint16_t calculateAvailableVolumeChecksum(uint32_t maxMl, uint32_t currentMl) {
 
 bool saveAvailableVolumeToFRAM(uint32_t maxMl, uint32_t currentMl) {
     if (!framInitialized) {
+        LOG_ERROR("");
         LOG_ERROR("FRAM not initialized for available volume save");
         return false;
     }
     
     // Sanity check: max 10L = 10000ml
     if (maxMl > 10000 || currentMl > 10000) {
+        LOG_ERROR("");
         LOG_ERROR("Invalid available volume: max=%lu, current=%lu (max 10000ml)", maxMl, currentMl);
         return false;
     }
@@ -713,16 +761,19 @@ bool saveAvailableVolumeToFRAM(uint32_t maxMl, uint32_t currentMl) {
     fram.read(FRAM_ADDR_AVAIL_VOL_CURRENT, (uint8_t*)&verifyCurrent, 4);
     
     if (verifyMax != maxMl || verifyCurrent != currentMl) {
+        LOG_ERROR("");
         LOG_ERROR("FRAM available volume write verification failed!");
         return false;
     }
     
+    LOG_INFO("");
     LOG_INFO("Available volume saved to FRAM: %lu/%lu ml", currentMl, maxMl);
     return true;
 }
 
 bool loadAvailableVolumeFromFRAM(uint32_t& maxMl, uint32_t& currentMl) {
     if (!framInitialized) {
+        LOG_ERROR("");
         LOG_ERROR("FRAM not initialized for available volume load");
         return false;
     }
@@ -735,6 +786,7 @@ bool loadAvailableVolumeFromFRAM(uint32_t& maxMl, uint32_t& currentMl) {
     fram.read(FRAM_ADDR_AVAIL_VOL_CHKSUM, (uint8_t*)&storedChecksum, 2);
     
     if (calculatedChecksum != storedChecksum) {
+        LOG_WARNING("");
         LOG_WARNING("Available volume checksum mismatch, using defaults");
         maxMl = 10000;
         currentMl = 10000;
@@ -742,12 +794,13 @@ bool loadAvailableVolumeFromFRAM(uint32_t& maxMl, uint32_t& currentMl) {
     }
     
     if (maxMl > 10000 || currentMl > 10000) {
+        LOG_WARNING("");
         LOG_WARNING("FRAM available volume out of range, using defaults");
         maxMl = 10000;
         currentMl = 10000;
         return false;
     }
-    
+    LOG_INFO("");
     LOG_INFO("Available volume loaded from FRAM: %lu/%lu ml", currentMl, maxMl);
     return true;
 }
@@ -762,12 +815,14 @@ uint16_t calculateFillMaxChecksum(uint16_t fillWaterMax) {
 
 bool saveFillWaterMaxToFRAM(uint16_t fillWaterMax) {
     if (!framInitialized) {
+        LOG_ERROR("");
         LOG_ERROR("FRAM not initialized for fill water max save");
         return false;
     }
     
     // Sanity check: 100ml - 10000ml
     if (fillWaterMax < 100 || fillWaterMax > 10000) {
+        LOG_ERROR("");
         LOG_ERROR("Invalid fill water max: %d (range: 100-10000ml)", fillWaterMax);
         return false;
     }
@@ -782,16 +837,19 @@ bool saveFillWaterMaxToFRAM(uint16_t fillWaterMax) {
     fram.read(FRAM_ADDR_FILL_WATER_MAX, (uint8_t*)&verifyValue, 2);
     
     if (verifyValue != fillWaterMax) {
+        LOG_ERROR("");
         LOG_ERROR("FRAM fill water max write verification failed!");
         return false;
     }
     
+    LOG_INFO("");
     LOG_INFO("Fill water max saved to FRAM: %d ml", fillWaterMax);
     return true;
 }
 
 bool loadFillWaterMaxFromFRAM(uint16_t& fillWaterMax) {
     if (!framInitialized) {
+        LOG_ERROR("");
         LOG_ERROR("FRAM not initialized for fill water max load");
         return false;
     }
@@ -803,17 +861,20 @@ bool loadFillWaterMaxFromFRAM(uint16_t& fillWaterMax) {
     fram.read(FRAM_ADDR_FILL_MAX_CHKSUM, (uint8_t*)&storedChecksum, 2);
     
     if (calculatedChecksum != storedChecksum) {
+        LOG_WARNING("");
         LOG_WARNING("Fill water max checksum mismatch, using default");
         fillWaterMax = FILL_WATER_MAX;  // Default from algorithm_config.h
         return false;
     }
     
     if (fillWaterMax < 100 || fillWaterMax > 10000) {
+        LOG_WARNING("");
         LOG_WARNING("FRAM fill water max out of range: %d, using default", fillWaterMax);
         fillWaterMax = FILL_WATER_MAX;
         return false;
     }
     
+    LOG_INFO("");
     LOG_INFO("Fill water max loaded from FRAM: %d ml", fillWaterMax);
     return true;
 }

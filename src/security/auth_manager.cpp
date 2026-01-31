@@ -5,14 +5,19 @@
 #include "../config/credentials_manager.h"
 
 void initAuthManager() {
+    LOG_INFO("");
     LOG_INFO("Authentication manager initialized");
 
     LOG_INFO("Using %s admin credentials", areCredentialsLoaded() ? "FRAM" : "fallback");
     if (areCredentialsLoaded()) {
+        LOG_INFO("");
         LOG_INFO("Using FRAM admin credentials");
     } else {
+        LOG_WARNING("");
+        LOG_WARNING("====================================");
         LOG_WARNING("⚠️ NO FRAM CREDENTIALS - Web authentication DISABLED!");
         LOG_WARNING("⚠️ Use Captive Portal to configure credentials!");
+        LOG_WARNING("");
     }
 }
 
@@ -50,11 +55,14 @@ String hashPassword(const String& password) {
 
 bool verifyPassword(const String& password) {
     if (!areCredentialsLoaded()) {
+        LOG_ERROR("");
+        LOG_ERROR("====================================");
         LOG_ERROR("🔒 Authentication BLOCKED - No FRAM credentials loaded!");
         LOG_ERROR("🔧 Use Captive Portal to configure credentials first:");
         LOG_ERROR("   1. Hold button for 5 seconds during boot");
         LOG_ERROR("   2. Connect to ESP32-WATER-SETUP WiFi");
         LOG_ERROR("   3. Configure credentials in browser");
+        LOG_ERROR("====================================");
         return false;  // Force FRAM setup!
     }
     
@@ -62,6 +70,7 @@ bool verifyPassword(const String& password) {
     String expectedHash = String(getAdminPasswordHash());
     
     if (expectedHash.length() == 0 || expectedHash == "NO_AUTH_REQUIRES_FRAM_PROGRAMMING") {
+        LOG_ERROR("");
         LOG_ERROR("Invalid admin hash from FRAM - check credential programming");
         return false;
     }
@@ -69,10 +78,14 @@ bool verifyPassword(const String& password) {
     bool valid = (inputHash == expectedHash);
 
     if (valid) {
+        LOG_INFO("");
         LOG_INFO("✅ Password verification successful (FRAM credentials)");
     } else {
+        LOG_WARNING("");
+        LOG_WARNING("====================================");
         LOG_WARNING("❌ Password verification failed");
         LOG_WARNING("💡 Verify admin password was correctly programmed to FRAM"); 
+        LOG_WARNING("====================================");
     }
     return valid;
 }
@@ -82,13 +95,14 @@ bool verifyPassword(const String& password) {
 // Requests from this IP bypass authentication
 // ============================================
 
-#include "../core/logging.h"
+// #include "../core/logging.h"
 
 // VPS WireGuard IP - requests from here are trusted
 const IPAddress TRUSTED_VPS_IP(10, 99, 0, 1);
 
 bool isTrustedProxyIP(IPAddress ip) {
     if (ip == TRUSTED_VPS_IP) {
+        // LOG_INFO("");
         // LOG_INFO("🔓 Trusted VPS proxy IP: %s", ip.toString().c_str());
         return true;
     }

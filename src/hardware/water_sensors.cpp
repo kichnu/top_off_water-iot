@@ -37,10 +37,11 @@ static void resetDebounceState() {
 }
 
 static void transitionToPhase(SensorPhase newPhase) {
+    LOG_INFO("");
     LOG_INFO("Phase transition: %s -> %s", getPhaseString(),
-             newPhase == PHASE_IDLE ? "IDLE" :
-             newPhase == PHASE_PRE_QUALIFICATION ? "PRE_QUAL" :
-             newPhase == PHASE_SETTLING ? "SETTLING" : "DEBOUNCING");
+    newPhase == PHASE_IDLE ? "IDLE" :
+    newPhase == PHASE_PRE_QUALIFICATION ? "PRE_QUAL" :
+    newPhase == PHASE_SETTLING ? "SETTLING" : "DEBOUNCING");
 
     currentPhase = newPhase;
     phaseStartTime = millis() / 1000;
@@ -58,12 +59,16 @@ void initWaterSensors() {
     resetPreQualState();
     resetDebounceState();
 
+    
+    LOG_INFO("");             
+    LOG_INFO("====================================");
     LOG_INFO("Water sensors initialized on pins %d and %d",
              WATER_SENSOR_1_PIN, WATER_SENSOR_2_PIN);
     LOG_INFO("Phase 1 config: PRE_QUAL=%ds/%d×%ds, SETTLING=%ds, DEBOUNCE=%ds/%d×%ds",
              PRE_QUAL_WINDOW, PRE_QUAL_CONFIRM_COUNT, PRE_QUAL_INTERVAL,
              SETTLING_TIME,
              TOTAL_DEBOUNCE_TIME, DEBOUNCE_COUNTER, DEBOUNCE_INTERVAL);
+    LOG_INFO("====================================");
 }
 
 // ============== ODCZYT SUROWY ==============
@@ -82,6 +87,7 @@ void resetSensorProcess() {
     lastCheckTime = 0;
     resetPreQualState();
     resetDebounceState();
+    LOG_INFO("");
     LOG_INFO("Sensor process reset to IDLE");
 }
 
@@ -110,10 +116,12 @@ void checkWaterSensors() {
         // ===============================================
         case PHASE_IDLE: {
             if (anyLow) {
+                LOG_INFO("");
                 LOG_INFO("====================================");
                 LOG_INFO("FIRST LOW DETECTED - Starting PRE_QUAL");
-                LOG_INFO("====================================");
                 LOG_INFO("S1=%s, S2=%s", sensor1Low ? "LOW" : "HIGH", sensor2Low ? "LOW" : "HIGH");
+                LOG_INFO("====================================");
+
 
                 transitionToPhase(PHASE_PRE_QUALIFICATION);
                 resetPreQualState();
@@ -134,11 +142,13 @@ void checkWaterSensors() {
 
             // Sprawdź timeout (> nie >= żeby pomiar na granicy timeout mógł się wykonać)
             if (elapsed > PRE_QUAL_WINDOW) {
+                LOG_INFO("");
                 LOG_INFO("====================================");
                 LOG_INFO("PRE_QUAL TIMEOUT - returning to IDLE");
-                LOG_INFO("====================================");
                 LOG_INFO("Counter was: %d/%d (needed %d consecutive)",
-                         preQualState.counter, PRE_QUAL_CONFIRM_COUNT, PRE_QUAL_CONFIRM_COUNT);
+                    preQualState.counter, PRE_QUAL_CONFIRM_COUNT, PRE_QUAL_CONFIRM_COUNT);
+                LOG_INFO("====================================");
+
 
                 // Cichy powrót do IDLE (bez błędu)
                 waterAlgorithm.onPreQualificationFail();
@@ -155,15 +165,18 @@ void checkWaterSensors() {
             // Pomiar - wymagamy LOW na którymkolwiek czujniku
             if (anyLow) {
                 preQualState.counter++;
+                LOG_INFO("");                         
                 LOG_INFO("PRE_QUAL: LOW confirmed, counter=%d/%d (elapsed %lus)",
                          preQualState.counter, PRE_QUAL_CONFIRM_COUNT, elapsed);
 
                 // Sprawdź czy osiągnięto wymaganą liczbę
                 if (preQualState.counter >= PRE_QUAL_CONFIRM_COUNT) {
+                    LOG_INFO("");
                     LOG_INFO("====================================");
                     LOG_INFO("PRE_QUAL SUCCESS - %d consecutive LOWs", PRE_QUAL_CONFIRM_COUNT);
-                    LOG_INFO("====================================");
                     LOG_INFO("Starting SETTLING phase (%ds)", SETTLING_TIME);
+                    LOG_INFO("====================================");
+
 
                     waterAlgorithm.onPreQualificationSuccess();
                     transitionToPhase(PHASE_SETTLING);
@@ -171,6 +184,7 @@ void checkWaterSensors() {
             } else {
                 // HIGH - reset licznika
                 if (preQualState.counter > 0) {
+                    LOG_INFO("");
                     LOG_INFO("PRE_QUAL: HIGH detected, counter reset (was %d)", preQualState.counter);
                 }
                 preQualState.counter = 0;
@@ -187,17 +201,20 @@ void checkWaterSensors() {
             // Status log co 15s
             static uint32_t lastSettlingLog = 0;
             if (currentTime - lastSettlingLog >= 15) {
+                LOG_INFO("");
                 LOG_INFO("SETTLING: %lu/%ds", elapsed, SETTLING_TIME);
                 lastSettlingLog = currentTime;
             }
 
             // Sprawdź czy minęło SETTLING_TIME
             if (elapsed >= SETTLING_TIME) {
+                LOG_INFO("");
                 LOG_INFO("====================================");
                 LOG_INFO("SETTLING COMPLETE - Starting DEBOUNCING");
-                LOG_INFO("====================================");
                 LOG_INFO("Debounce config: %ds timeout, %ds interval, %d×LOW needed",
-                         TOTAL_DEBOUNCE_TIME, DEBOUNCE_INTERVAL, DEBOUNCE_COUNTER);
+                    TOTAL_DEBOUNCE_TIME, DEBOUNCE_INTERVAL, DEBOUNCE_COUNTER);
+                LOG_INFO("====================================");
+
 
                 waterAlgorithm.onSettlingComplete();
                 transitionToPhase(PHASE_DEBOUNCING);
@@ -214,15 +231,15 @@ void checkWaterSensors() {
 
             // Sprawdź timeout (> nie >= żeby pomiar na granicy timeout mógł się wykonać)
             if (elapsed > TOTAL_DEBOUNCE_TIME) {
-                LOG_INFO("====================================");
-                LOG_INFO("DEBOUNCE TIMEOUT (%ds)", TOTAL_DEBOUNCE_TIME);
-                LOG_INFO("====================================");
-
                 bool s1OK = debounceState[0].complete;
                 bool s2OK = debounceState[1].complete;
 
+                LOG_INFO("");
+                LOG_INFO("====================================");
+                LOG_INFO("DEBOUNCE TIMEOUT (%ds)", TOTAL_DEBOUNCE_TIME);
                 LOG_INFO("S1: %s (counter=%d)", s1OK ? "COMPLETE" : "FAILED", debounceState[0].counter);
                 LOG_INFO("S2: %s (counter=%d)", s2OK ? "COMPLETE" : "FAILED", debounceState[1].counter);
+                LOG_INFO("====================================");
 
                 waterAlgorithm.onDebounceTimeout(s1OK, s2OK);
                 resetSensorProcess();
@@ -231,10 +248,12 @@ void checkWaterSensors() {
 
             // Sprawdź czy oba czujniki zaliczone (wczesne zakończenie)
             if (debounceState[0].complete && debounceState[1].complete) {
+                LOG_INFO("");
                 LOG_INFO("====================================");
                 LOG_INFO("DEBOUNCE SUCCESS - BOTH SENSORS OK");
-                LOG_INFO("====================================");
                 LOG_INFO("Elapsed: %lus (early completion)", elapsed);
+                LOG_INFO("====================================");
+
 
                 waterAlgorithm.onDebounceBothComplete();
                 resetSensorProcess();
@@ -263,6 +282,7 @@ void checkWaterSensors() {
                     if (debounceState[i].counter >= DEBOUNCE_COUNTER) {
                         debounceState[i].complete = true;
                         debounceState[i].completeTime = currentTime;
+                        LOG_INFO("");
                         LOG_INFO("S%d: DEBOUNCE COMPLETE at %lus!", i + 1, currentTime);
 
                         waterAlgorithm.onSensorDebounceComplete(i + 1);
@@ -270,6 +290,7 @@ void checkWaterSensors() {
                 } else {
                     // HIGH - reset licznika
                     if (debounceState[i].counter > 0) {
+                        LOG_INFO("");
                         LOG_INFO("S%d: HIGH, counter reset (was %d)", i + 1, debounceState[i].counter);
                     }
                     debounceState[i].counter = 0;

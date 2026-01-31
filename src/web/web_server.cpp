@@ -61,6 +61,7 @@ void initWebServer() {
     });
     
     server.begin();
+    LOG_INFO("");
     LOG_INFO("Web server started on port 80");
 }
 

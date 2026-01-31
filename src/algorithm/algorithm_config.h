@@ -5,16 +5,16 @@
 #define LOGGING_TIME            5      // czas na logowanie po cyklu
 
 // ============== PARAMETRY PRE-QUALIFICATION (szybki test pierwszego LOW) ==============
-#define PRE_QUAL_WINDOW         12     // sekundy - okno czasowe na potwierdzenie
-#define PRE_QUAL_INTERVAL       4     // sekundy - interwał między pomiarami
+#define PRE_QUAL_WINDOW         30     // sekundy - okno czasowe na potwierdzenie
+#define PRE_QUAL_INTERVAL       10     // sekundy - interwał między pomiarami
 #define PRE_QUAL_CONFIRM_COUNT  3      // wymagana liczba kolejnych LOW
 
 // ============== PARAMETRY SETTLING (uspokojenie wody) ==============
-#define SETTLING_TIME           10     // sekundy - czas pasywnego czekania
+#define SETTLING_TIME           60     // sekundy - czas pasywnego czekania
 
 // ============== PARAMETRY DEBOUNCING FAZY 1 (weryfikacja opadania wody) ==============
-#define TOTAL_DEBOUNCE_TIME     50   // sekundy - maksymalny czas fazy debouncing (20 minut)
-#define DEBOUNCE_INTERVAL       10     // sekundy - interwał między pomiarami
+#define TOTAL_DEBOUNCE_TIME     1200   // sekundy - maksymalny czas fazy debouncing (20 minut)
+#define DEBOUNCE_INTERVAL       60     // sekundy - interwał między pomiarami
 #define DEBOUNCE_COUNTER        4      // wymagana liczba kolejnych LOW dla zaliczenia
 
 // ============== PARAMETRY RELEASE VERIFICATION (faza 2 - podnoszenie wody) ==============
@@ -37,16 +37,16 @@
 #define DEBOUNCE_COUNTER_1      DEBOUNCE_COUNTER     // alias dla starych odwołań
 
 // ============== SPRAWDZENIA INTEGRALNOŚCI ==============
-// static_assert(PRE_QUAL_WINDOW >= 20 && PRE_QUAL_WINDOW <= 60, "PRE_QUAL_WINDOW must be 20-60s");
-// static_assert(PRE_QUAL_INTERVAL >= 5 && PRE_QUAL_INTERVAL <= 15, "PRE_QUAL_INTERVAL must be 5-15s");
-// static_assert(PRE_QUAL_CONFIRM_COUNT >= 2 && PRE_QUAL_CONFIRM_COUNT <= 5, "PRE_QUAL_CONFIRM_COUNT must be 2-5");
-// static_assert(SETTLING_TIME >= 30 && SETTLING_TIME <= 120, "SETTLING_TIME must be 30-120s");
-// static_assert(TOTAL_DEBOUNCE_TIME >= 600 && TOTAL_DEBOUNCE_TIME <= 2400, "TOTAL_DEBOUNCE_TIME must be 600-2400s");
-// static_assert(DEBOUNCE_INTERVAL >= 30 && DEBOUNCE_INTERVAL <= 120, "DEBOUNCE_INTERVAL must be 30-120s");
-// static_assert(DEBOUNCE_COUNTER >= 2 && DEBOUNCE_COUNTER <= 10, "DEBOUNCE_COUNTER must be 2-10");
-// static_assert(SINGLE_DOSE_VOLUME >= 100 && SINGLE_DOSE_VOLUME <= 800, "SINGLE_DOSE_VOLUME must be 100-300ml");
-// static_assert(FILL_WATER_MAX >= 1000 && FILL_WATER_MAX <= 3000, "FILL_WATER_MAX must be 1000-3000ml");
-// static_assert(LOGGING_TIME == 5, "LOGGING_TIME must be 5 seconds");
+static_assert(PRE_QUAL_WINDOW >= 20 && PRE_QUAL_WINDOW <= 60, "PRE_QUAL_WINDOW must be 20-60s");
+static_assert(PRE_QUAL_INTERVAL >= 5 && PRE_QUAL_INTERVAL <= 15, "PRE_QUAL_INTERVAL must be 5-15s");
+static_assert(PRE_QUAL_CONFIRM_COUNT >= 2 && PRE_QUAL_CONFIRM_COUNT <= 5, "PRE_QUAL_CONFIRM_COUNT must be 2-5");
+static_assert(SETTLING_TIME >= 30 && SETTLING_TIME <= 120, "SETTLING_TIME must be 30-120s");
+static_assert(TOTAL_DEBOUNCE_TIME >= 600 && TOTAL_DEBOUNCE_TIME <= 2400, "TOTAL_DEBOUNCE_TIME must be 600-2400s");
+static_assert(DEBOUNCE_INTERVAL >= 30 && DEBOUNCE_INTERVAL <= 120, "DEBOUNCE_INTERVAL must be 30-120s");
+static_assert(DEBOUNCE_COUNTER >= 2 && DEBOUNCE_COUNTER <= 10, "DEBOUNCE_COUNTER must be 2-10");
+static_assert(SINGLE_DOSE_VOLUME >= 100 && SINGLE_DOSE_VOLUME <= 800, "SINGLE_DOSE_VOLUME must be 100-300ml");
+static_assert(FILL_WATER_MAX >= 1000 && FILL_WATER_MAX <= 3000, "FILL_WATER_MAX must be 1000-3000ml");
+static_assert(LOGGING_TIME == 5, "LOGGING_TIME must be 5 seconds");
 
 // ============== STANY ALGORYTMU ==============
 enum AlgorithmState {
