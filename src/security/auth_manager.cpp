@@ -91,20 +91,27 @@ bool verifyPassword(const String& password) {
 }
 
 // ============================================
-// TRUSTED PROXY IP - VPS reverse proxy
+// TRUSTED PROXY - VPS reverse proxy
 // Requests from this IP bypass authentication
 // ============================================
 
-// #include "../core/logging.h"
+bool isTrustedProxy(IPAddress ip) {
+    return ip == TRUSTED_PROXY_IP;
+}
 
-// VPS WireGuard IP - requests from here are trusted
-const IPAddress TRUSTED_VPS_IP(10, 99, 0, 1);
-
-bool isTrustedProxyIP(IPAddress ip) {
-    if (ip == TRUSTED_VPS_IP) {
-        // LOG_INFO("");
-        // LOG_INFO("🔓 Trusted VPS proxy IP: %s", ip.toString().c_str());
-        return true;
+IPAddress resolveClientIP(AsyncWebServerRequest* request) {
+    IPAddress sourceIP = request->client()->remoteIP();
+    if (isTrustedProxy(sourceIP) && request->hasHeader("X-Forwarded-For")) {
+        String xff = request->getHeader("X-Forwarded-For")->value();
+        int comma = xff.indexOf(',');
+        String clientStr = (comma > 0) ? xff.substring(0, comma) : xff;
+        clientStr.trim();
+        IPAddress realIP;
+        if (realIP.fromString(clientStr)) {
+            LOG_INFO("Proxy request: %s via %s", clientStr.c_str(), sourceIP.toString().c_str());
+            return realIP;
+        }
+        LOG_WARNING("Failed to parse X-Forwarded-For: %s", xff.c_str());
     }
-    return false;
+    return sourceIP;
 }

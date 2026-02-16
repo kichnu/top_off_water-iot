@@ -50,10 +50,13 @@ void initWebServer() {
     // Cycle History endpoint
     server.on("/api/cycle-history", HTTP_GET, handleGetCycleHistory);
 
+    // Health check endpoint (no session required)
+    server.on("/api/health", HTTP_GET, handleHealth);
+
     // 404 handler - also enforce whitelist
     server.onNotFound([](AsyncWebServerRequest* request) {
         IPAddress clientIP = request->client()->remoteIP();
-        if (!isTrustedProxyIP(clientIP) && !isIPAllowed(clientIP)) {
+        if (!isTrustedProxy(clientIP) && !isIPAllowed(clientIP)) {
             request->send(403, "text/plain", "Forbidden");
             return;
         }
@@ -65,16 +68,12 @@ void initWebServer() {
     LOG_INFO("Web server started on port 80");
 }
 
-// ============== TRUSTED VPS PROXY IP ==============
-// Function defined in auth_manager.cpp - just declare extern
-extern bool isTrustedProxyIP(IPAddress ip);
-
 bool checkAuthentication(AsyncWebServerRequest* request) {
     IPAddress clientIP = request->client()->remoteIP();
     
     // ============== TRUSTED PROXY CHECK (PRIORITY) ==============
     // VPS proxy requests skip all authentication
-    if (isTrustedProxyIP(clientIP)) {
+    if (isTrustedProxy(clientIP)) {
         return true;
     }
     

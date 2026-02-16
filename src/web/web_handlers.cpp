@@ -17,7 +17,7 @@
 
 void handleDashboard(AsyncWebServerRequest* request) {
     if (!checkAuthentication(request)) {
-        request->redirect("/login");
+        request->redirect("login");
         return;
     }
     AsyncWebServerResponse* response = request->beginResponse_P(
@@ -27,7 +27,7 @@ void handleDashboard(AsyncWebServerRequest* request) {
 
 void handleLoginPage(AsyncWebServerRequest* request) {
     IPAddress clientIP = request->client()->remoteIP();
-    if (!isTrustedProxyIP(clientIP) && !isIPAllowed(clientIP)) {
+    if (!isIPAllowed(clientIP) && !isTrustedProxy(clientIP)) {
         request->send(403, "text/plain", "Forbidden");
         return;
     }
@@ -40,8 +40,8 @@ void handleLoginPage(AsyncWebServerRequest* request) {
 void handleLogin(AsyncWebServerRequest* request) {
     IPAddress clientIP = request->client()->remoteIP();
 
-    // Whitelist check - block login from unknown IPs
-    if (!isIPAllowed(clientIP)) {
+    // Whitelist check - block login from unknown IPs (proxy allowed)
+    if (!isIPAllowed(clientIP) && !isTrustedProxy(clientIP)) {
         LOG_WARNING("Login attempt from non-whitelisted IP: %s", clientIP.toString().c_str());
         request->send(403, "application/json", "{\"success\":false,\"error\":\"Access denied\"}");
         return;
@@ -508,21 +508,20 @@ void handleGetDailyVolume(AsyncWebServerRequest* request) {
 }
 
 void handleResetDailyVolume(AsyncWebServerRequest* request) {
-    IPAddress clientIP = request->client()->remoteIP();
-    
     // Check authentication
     if (!checkAuthentication(request)) {
-        LOG_WARNING("Unauthorized daily volume reset attempt from %s", clientIP.toString().c_str());
+        LOG_WARNING("Unauthorized daily volume reset attempt from %s", resolveClientIP(request).toString().c_str());
         request->send(401, "application/json", "{\"success\":false,\"error\":\"Unauthorized\"}");
         return;
     }
     
     // Check rate limiting
+    IPAddress clientIP = resolveClientIP(request);
     if (isRateLimited(clientIP)) {
         request->send(429, "application/json", "{\"success\":false,\"error\":\"Too many requests\"}");
         return;
     }
-    
+
     LOG_INFO("Daily volume reset requested from %s", clientIP.toString().c_str());
     
     // Perform reset
@@ -724,4 +723,24 @@ void handleGetCycleHistory(AsyncWebServerRequest* request) {
     String jsonResponse;
     serializeJson(doc, jsonResponse);
     request->send(200, "application/json", jsonResponse);
+}
+
+// ===============================
+// HEALTH CHECK HANDLER
+// ===============================
+
+void handleHealth(AsyncWebServerRequest *request) {
+    IPAddress sourceIP = request->client()->remoteIP();
+    if (!isIPAllowed(sourceIP) && !isTrustedProxy(sourceIP)) {
+        request->send(403, "application/json", "{\"error\":\"Forbidden\"}");
+        return;
+    }
+
+    String json = "{";
+    json += "\"status\":\"ok\",";
+    json += "\"device_name\":\"" + String(getDeviceID()) + "\",";
+    json += "\"uptime\":" + String(millis());
+    json += "}";
+
+    request->send(200, "application/json", json);
 }

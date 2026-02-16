@@ -214,7 +214,7 @@ const char* LOGIN_HTML = R"rawliteral(
             .then((response) => response.json())
             .then((data) => {
                 if (data.success) {
-                    window.location.href = "/";
+                    window.location.href = "./";
                 } else {
                     errorDiv.textContent = data.error || "Login failed";
                     errorDiv.style.display = "block";
@@ -1290,7 +1290,9 @@ const char* DASHBOARD_HTML = R"rawliteral(
                     ">
                         <h2 style="color: #e74c3c; margin-bottom: 15px;">Session Expired</h2>
                         <p style="color: #666; margin-bottom: 25px;">Your session has expired. Please log in again.</p>
-                        <a href="/login" style="
+                        <a href="login"
+                           onclick="if(window.location.pathname.indexOf('/device/')!==-1){window.location.href='/dashboard';return false;}"
+                           style="
                             display: inline-block; padding: 12px 30px;
                             background: #3498db; color: white;
                             text-decoration: none; border-radius: 8px;
@@ -1897,7 +1899,11 @@ const char* DASHBOARD_HTML = R"rawliteral(
         // ============================================
         function logout() {
             fetch("api/logout", { method: "POST" }).then(() => {
-                window.location.href = "/login";
+                if (window.location.pathname.indexOf("/device/") !== -1) {
+                    window.location.href = "/dashboard";
+                } else {
+                    window.location.href = "login";
+                }
             });
         }
 

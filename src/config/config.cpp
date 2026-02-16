@@ -11,6 +11,9 @@ const char* WIFI_PASSWORD = "SETUP_REQUIRED";
 
 const char* ADMIN_PASSWORD_HASH = nullptr;  // ✅ Force FRAM setup!
 
+// Trusted proxy IP — NIE w ALLOWED_IPS[] (oddzielna sciezka auto-auth)
+const IPAddress TRUSTED_PROXY_IP(10, 99, 0, 1);
+
 const IPAddress ALLOWED_IPS[] = {
     IPAddress(192, 168, 2, 10),
     IPAddress(192, 168, 2, 20)

@@ -20,6 +20,9 @@ extern const char* VPS_URL;
 extern const char* VPS_AUTH_TOKEN;
 extern const char* DEVICE_ID;
 
+// ================= TRUSTED PROXY (WireGuard VPS) =================
+extern const IPAddress TRUSTED_PROXY_IP;
+
 // ============== SYSTEM DISABLE/ENABLE ==============
 // System-wide disable with 30-minute auto-enable
 // Replaces old pump toggle with full system control

@@ -48,4 +48,7 @@ void handleSetFillWaterMax(AsyncWebServerRequest* request);
 // Cycle History endpoint
 void handleGetCycleHistory(AsyncWebServerRequest* request);
 
+// Health check endpoint (no session required)
+void handleHealth(AsyncWebServerRequest *request);
+
 #endif
