@@ -19,8 +19,8 @@ void initWebServer() {
     
     // API endpoints
     server.on("/api/status", HTTP_GET, handleStatus);
-    server.on("/api/pump/normal", HTTP_POST, handlePumpNormal);
-    server.on("/api/pump/extended", HTTP_POST, handlePumpExtended);
+    server.on("/api/pump/direct-on", HTTP_POST, handleDirectPumpOn);
+    server.on("/api/pump/direct-off", HTTP_POST, handleDirectPumpOff);
     server.on("/api/pump/stop", HTTP_POST, handlePumpStop);
     server.on("/api/pump-settings", HTTP_GET | HTTP_POST, handlePumpSettings);
     
@@ -49,6 +49,9 @@ void initWebServer() {
 
     // Cycle History endpoint
     server.on("/api/cycle-history", HTTP_GET, handleGetCycleHistory);
+
+    // System reset
+    server.on("/api/system-reset", HTTP_POST, handleSystemReset);
 
     // Health check endpoint (no session required)
     server.on("/api/health", HTTP_GET, handleHealth);

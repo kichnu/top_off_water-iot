@@ -140,17 +140,6 @@ void handleStatus(AsyncWebServerRequest* request) {
     // ============================================
     json["system_disabled"] = isSystemDisabled();
     
-    // Calculate remaining seconds for system auto-enable
-    if (isSystemDisabled() && systemDisabledTime > 0) {
-        unsigned long elapsed = millis() - systemDisabledTime;
-        if (elapsed < SYSTEM_AUTO_ENABLE_MS) {
-            json["system_remaining_seconds"] = (SYSTEM_AUTO_ENABLE_MS - elapsed) / 1000;
-        } else {
-            json["system_remaining_seconds"] = 0;
-        }
-    } else {
-        json["system_remaining_seconds"] = 0;
-    }
     
     // ============================================
     // PROCESS STATUS (for description + remaining time)
@@ -193,44 +182,45 @@ void handleStatus(AsyncWebServerRequest* request) {
     request->send(200, "application/json", response);
 }
 
-void handlePumpNormal(AsyncWebServerRequest* request) {
+void handleDirectPumpOn(AsyncWebServerRequest* request) {
     if (!checkAuthentication(request)) {
         request->send(401, "text/plain", "Unauthorized");
         return;
     }
-    
-    bool success = triggerPump(currentPumpSettings.manualCycleSeconds, "MANUAL_NORMAL");
-    
+
+    uint16_t duration = currentPumpSettings.manualCycleSeconds;
+    String mode = "bistable";
+    if (request->hasParam("mode", true) && request->getParam("mode", true)->value() == "monostable") {
+        duration = DIRECT_PUMP_SAFETY_TIMEOUT_S;
+        mode = "monostable";
+    }
+
+    bool success = directPumpOn(duration);
+
     JsonDocument json;
     json["success"] = success;
-    json["duration"] = currentPumpSettings.manualCycleSeconds;
-    json["volume_ml"] = currentPumpSettings.manualCycleSeconds * currentPumpSettings.volumePerSecond;
-    
+    json["duration"] = duration;
+    json["mode"] = mode;
+
     String response;
     serializeJson(json, response);
     request->send(200, "application/json", response);
-    
-    LOG_INFO("Manual normal pump triggered via web");
 }
 
-void handlePumpExtended(AsyncWebServerRequest* request) {
+void handleDirectPumpOff(AsyncWebServerRequest* request) {
     if (!checkAuthentication(request)) {
         request->send(401, "text/plain", "Unauthorized");
         return;
     }
-    
-    bool success = triggerPump(currentPumpSettings.calibrationCycleSeconds, "MANUAL_EXTENDED");
-    
+
+    directPumpOff();
+
     JsonDocument json;
-    json["success"] = success;
-    json["duration"] = currentPumpSettings.calibrationCycleSeconds;
-    json["type"] = "extended";
-    
+    json["success"] = true;
+
     String response;
     serializeJson(json, response);
     request->send(200, "application/json", response);
-    
-    LOG_INFO("Manual extended pump triggered via web");
 }
 
 void handlePumpStop(AsyncWebServerRequest* request) {
@@ -314,64 +304,27 @@ void handleSystemToggle(AsyncWebServerRequest* request) {
     }
     
     if (request->method() == HTTP_GET) {
-        // Return current system state
         JsonDocument json;
         json["success"] = true;
-        json["enabled"] = !isSystemDisabled();  // enabled = NOT disabled
-        
-        if (isSystemDisabled() && systemDisabledTime > 0) {
-            unsigned long elapsed = millis() - systemDisabledTime;
-            if (elapsed < SYSTEM_AUTO_ENABLE_MS) {
-                json["remaining_seconds"] = (SYSTEM_AUTO_ENABLE_MS - elapsed) / 1000;
-            } else {
-                json["remaining_seconds"] = 0;
-            }
-        } else {
-            json["remaining_seconds"] = 0;
-        }
-        
+        json["enabled"] = !isSystemDisabled();
+
         String response;
         serializeJson(json, response);
         request->send(200, "application/json", response);
-        
+
     } else if (request->method() == HTTP_POST) {
-        // Toggle system state using INLINE LOGIC
-        // (avoids inverted state bug from using setSystemState with !isSystemDisabled)
-        
         bool currentlyDisabled = isSystemDisabled();
-        
-        if (currentlyDisabled) {
-            // System is disabled -> ENABLE it
-            setSystemState(true);  // true = enabled
-            
-            JsonDocument json;
-            json["success"] = true;
-            json["enabled"] = true;
-            json["message"] = "System enabled";
-            json["remaining_seconds"] = 0;
-            
-            String response;
-            serializeJson(json, response);
-            request->send(200, "application/json", response);
-            
-            LOG_INFO("System ENABLED via web interface");
-            
-        } else {
-            // System is enabled -> DISABLE it
-            setSystemState(false);  // false = disabled
-            
-            JsonDocument json;
-            json["success"] = true;
-            json["enabled"] = false;
-            json["message"] = "System disabled for 30 minutes";
-            json["remaining_seconds"] = SYSTEM_AUTO_ENABLE_MS / 1000;
-            
-            String response;
-            serializeJson(json, response);
-            request->send(200, "application/json", response);
-            
-            LOG_INFO("System DISABLED via web interface (30 min timeout)");
-        }
+        setSystemState(currentlyDisabled);  // toggle
+
+        JsonDocument json;
+        json["success"] = true;
+        json["enabled"] = currentlyDisabled;  // was disabled → now enabled, and vice versa
+
+        String response;
+        serializeJson(json, response);
+        request->send(200, "application/json", response);
+
+        LOG_INFO("System %s via web interface", currentlyDisabled ? "ENABLED" : "DISABLED");
     }
 }
 
@@ -723,6 +676,28 @@ void handleGetCycleHistory(AsyncWebServerRequest* request) {
     String jsonResponse;
     serializeJson(doc, jsonResponse);
     request->send(200, "application/json", jsonResponse);
+}
+
+// ===============================
+// SYSTEM RESET HANDLER
+// ===============================
+
+void handleSystemReset(AsyncWebServerRequest* request) {
+    if (!checkAuthentication(request)) {
+        request->send(401, "text/plain", "Unauthorized");
+        return;
+    }
+
+    bool success = waterAlgorithm.resetSystem();
+
+    JsonDocument json;
+    json["success"] = success;
+    json["state"] = waterAlgorithm.getStateString();
+    json["message"] = success ? "System reset to IDLE" : "Reset blocked - logging in progress";
+
+    String response;
+    serializeJson(json, response);
+    request->send(200, "application/json", response);
 }
 
 // ===============================

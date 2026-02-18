@@ -24,15 +24,10 @@ extern const char* DEVICE_ID;
 extern const IPAddress TRUSTED_PROXY_IP;
 
 // ============== SYSTEM DISABLE/ENABLE ==============
-// System-wide disable with 30-minute auto-enable
-// Replaces old pump toggle with full system control
 extern bool systemDisabled;
-extern unsigned long systemDisabledTime;
-extern const unsigned long SYSTEM_AUTO_ENABLE_MS;
 
 // System state functions (declare BEFORE any mode_config includes)
 void setSystemState(bool enabled);
-void checkSystemAutoEnable();
 bool isSystemDisabled();
 
 // Global pump control (LEGACY - kept for compatibility, will be removed)
@@ -40,6 +35,9 @@ extern bool pumpGlobalEnabled;
 extern unsigned long pumpDisabledTime;
 extern const unsigned long PUMP_AUTO_ENABLE_MS;
 
+
+// Direct manual pump safety timeout (monostable mode)
+#define DIRECT_PUMP_SAFETY_TIMEOUT_S 120
 
 // Stałe mogą być tutaj
 const unsigned long SESSION_TIMEOUT_MS = 1800000; 

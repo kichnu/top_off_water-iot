@@ -157,6 +157,9 @@ public:
     // Reset after error
     void resetFromError();
 
+    // Remote system reset (works from any state except LOGGING)
+    bool resetSystem();
+
     // Reset statistics and get current stats for display
     bool resetErrorStatistics();
     bool getErrorStatistics(uint16_t &gap1_sum, uint16_t &gap2_sum, uint16_t &water_sum, uint32_t &last_reset);

@@ -1258,6 +1258,60 @@ void WaterAlgorithm::resetFromError() {
     LOG_INFO("System reset from error state");
 }
 
+bool WaterAlgorithm::resetSystem() {
+    LOG_INFO("");
+    LOG_INFO("resetSystem() called — current state: %s", getStateString());
+
+    if (currentState == STATE_IDLE) {
+        LOG_INFO("System already in IDLE — no action needed");
+        return true;
+    }
+
+    if (currentState == STATE_LOGGING) {
+        LOG_WARNING("Reset blocked — logging in progress, please wait");
+        return false;
+    }
+
+    if (currentState == STATE_ERROR) {
+        resetFromError();
+        LOG_INFO("System reset from ERROR to IDLE");
+        return true;
+    }
+
+    // Active cycle (PRE_QUALIFICATION, SETTLING, DEBOUNCING, PUMPING_AND_VERIFY, MANUAL_OVERRIDE)
+    LOG_WARNING("resetSystem() — interrupting active cycle in state: %s", getStateString());
+
+    // Stop pump if running
+    if (isPumpActive()) {
+        LOG_WARNING("Stopping active pump");
+        stopPump();
+    }
+
+    // Calculate and save partial volume if pump ran during this cycle
+    if (pumpStartTime > 0 && currentCycle.pump_duration > 0) {
+        uint32_t pumpedSeconds = getCurrentTimeSeconds() - pumpStartTime;
+        if (pumpedSeconds > currentCycle.pump_duration) {
+            pumpedSeconds = currentCycle.pump_duration;
+        }
+        uint16_t actualVolumeML = (uint16_t)(pumpedSeconds * currentPumpSettings.volumePerSecond);
+        currentCycle.volume_dose = actualVolumeML;
+
+        framBusy = true;
+        if (actualVolumeML > 0) {
+            dailyVolumeML += actualVolumeML;
+            saveDailyVolumeToFRAM(dailyVolumeML, lastResetUTCDay);
+            LOG_INFO("Partial volume saved: %dml, daily total: %dml", actualVolumeML, dailyVolumeML);
+        }
+        saveCycleToStorage(currentCycle);
+        framBusy = false;
+    }
+
+    currentState = STATE_IDLE;
+    resetCycle();
+    LOG_INFO("System reset to IDLE");
+    return true;
+}
+
 void WaterAlgorithm::loadCyclesFromStorage() {
     LOG_INFO("");
     LOG_INFO("Loading cycles from FRAM...");
@@ -1546,20 +1600,6 @@ bool WaterAlgorithm::resetDailyVolume() {
 String WaterAlgorithm::getStateDescription() const {
     // ============== SYSTEM DISABLED STATE ==============
     if (isSystemDisabled()) {
-        unsigned long remaining = 0;
-        if (systemDisabledTime > 0) {
-            unsigned long elapsed = millis() - systemDisabledTime;
-            if (elapsed < SYSTEM_AUTO_ENABLE_MS) {
-                remaining = (SYSTEM_AUTO_ENABLE_MS - elapsed) / 1000;
-            }
-        }
-        
-        if (remaining > 0) {
-            uint32_t minutes = remaining / 60;
-            uint32_t seconds = remaining % 60;
-            return "SYSTEM OFF - Auto-enable in " + String(minutes) + ":" + 
-                   (seconds < 10 ? "0" : "") + String(seconds);
-        }
         return "SYSTEM OFF";
     }
     
@@ -1608,15 +1648,6 @@ String WaterAlgorithm::getStateDescription() const {
 }
 
 uint32_t WaterAlgorithm::getRemainingSeconds() const {
-    // ============== SYSTEM DISABLED COUNTDOWN ==============
-    if (isSystemDisabled() && systemDisabledTime > 0) {
-        unsigned long elapsed = millis() - systemDisabledTime;
-        if (elapsed < SYSTEM_AUTO_ENABLE_MS) {
-            return (SYSTEM_AUTO_ENABLE_MS - elapsed) / 1000;
-        }
-        return 0;
-    }
-    
     uint32_t currentTime = getCurrentTimeSeconds();
     uint32_t elapsed = 0;
     uint32_t total = 0;

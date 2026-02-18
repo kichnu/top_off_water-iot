@@ -18,6 +18,7 @@ String currentActionType = "";
 
 static bool pumpActive = false;
 static bool manualPumpActive = false;
+static bool directPumpMode = false;
 
 void initPumpController() {
 
@@ -31,8 +32,8 @@ void initPumpController() {
 
 void updatePumpController() {
 
-        // Check global pump state - stop if disabled
-    if (!pumpGlobalEnabled && pumpRunning) {
+        // Check global pump state - stop if disabled (but not in direct mode)
+    if (!pumpGlobalEnabled && pumpRunning && !directPumpMode) {
         digitalWrite(PUMP_RELAY_PIN, HIGH);
         pumpRunning = false;
         LOG_INFO("");
@@ -44,16 +45,19 @@ void updatePumpController() {
         // Stop pump and log event
         digitalWrite(PUMP_RELAY_PIN, HIGH);
         pumpRunning = false;
-        
+
         uint16_t actualDuration = (millis() - pumpStartTime) / 1000;
-        // uint16_t volumeML = actualDuration * currentPumpSettings.volumePerSecond;
         uint16_t volumeML = (uint16_t)round(actualDuration * currentPumpSettings.volumePerSecond);
-        
+
         LOG_INFO("");
-        LOG_INFO("Pump stopped after %d seconds, estimated volume: %d ml", 
+        LOG_INFO("Pump stopped after %d seconds, estimated volume: %d ml",
                  actualDuration, volumeML);
 
-        if (currentActionType == "MANUAL_NORMAL") {
+        if (directPumpMode) {
+            directPumpMode = false;
+            LOG_INFO("");
+            LOG_INFO("Direct pump safety timeout reached - pump stopped");
+        } else if (currentActionType == "MANUAL_NORMAL") {
             // Access water algorithm to update daily volume
             waterAlgorithm.addManualVolume(volumeML);
             LOG_INFO("");
@@ -63,15 +67,11 @@ void updatePumpController() {
             LOG_INFO("ℹ️ MANUAL_EXTENDED (calibration) - NOT added to daily volume");
         }
 
-        // if (!currentActionType.startsWith("AUTO")) {
-        //     uint32_t unixTime = getUnixTimestamp();
-        //     logEventToVPS(currentActionType, volumeML, unixTime);
-        // }
-        currentActionType = "";       
+        currentActionType = "";
     }
 
       static bool wasManualActive = false;
-    if (wasManualActive && !manualPumpActive && !pumpRunning) {
+    if (wasManualActive && !manualPumpActive && !pumpRunning && !directPumpMode) {
         waterAlgorithm.onManualPumpComplete();
         wasManualActive = false;
     }
@@ -134,17 +134,19 @@ void stopPump() {
     if (pumpRunning) {
         digitalWrite(PUMP_RELAY_PIN, HIGH);
         pumpRunning = false;
-        
+
         // Calculate actual duration and volume
         uint16_t actualDuration = (millis() - pumpStartTime) / 1000;
         uint16_t volumeML = (uint16_t)round(actualDuration * currentPumpSettings.volumePerSecond);
-        
+
         LOG_INFO("");
-        LOG_INFO("Pump manually stopped after %d seconds, estimated volume: %d ml", 
+        LOG_INFO("Pump manually stopped after %d seconds, estimated volume: %d ml",
                  actualDuration, volumeML);
-        
-        // Update available volume for manual pump
-        if (currentActionType == "MANUAL_NORMAL") {
+
+        if (directPumpMode) {
+            directPumpMode = false;
+            LOG_INFO("Direct pump stopped via stopPump()");
+        } else if (currentActionType == "MANUAL_NORMAL") {
             waterAlgorithm.addManualVolume(volumeML);
             LOG_INFO("");
             LOG_INFO("MANUAL_NORMAL stopped early: %dml (available volume updated)", volumeML);
@@ -152,7 +154,47 @@ void stopPump() {
             LOG_INFO("");
             LOG_INFO("MANUAL_EXTENDED (calibration) stopped - NOT added to volume");
         }
-    
+
         currentActionType = "";
     }
+}
+
+bool directPumpOn(uint16_t durationSeconds) {
+    if (pumpRunning && !directPumpMode) {
+        LOG_WARNING("directPumpOn blocked — algorithm pump is running");
+        return false;
+    }
+    if (pumpRunning && directPumpMode) {
+        // Already running in direct mode — ignore
+        return true;
+    }
+
+    directPumpMode = true;
+    digitalWrite(PUMP_RELAY_PIN, LOW);
+    pumpRunning = true;
+    pumpStartTime = millis();
+    pumpDuration = durationSeconds * 1000UL;
+    currentActionType = "DIRECT_MANUAL";
+
+    LOG_INFO("");
+    LOG_INFO("Direct pump ON for %d seconds", durationSeconds);
+    return true;
+}
+
+void directPumpOff() {
+    if (!pumpRunning || !directPumpMode) {
+        return;
+    }
+
+    digitalWrite(PUMP_RELAY_PIN, HIGH);
+    pumpRunning = false;
+    directPumpMode = false;
+    currentActionType = "";
+
+    LOG_INFO("");
+    LOG_INFO("Direct pump stopped");
+}
+
+bool isDirectPumpMode() {
+    return directPumpMode;
 }

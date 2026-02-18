@@ -62,7 +62,7 @@ After debounce, the pump runs for a calculated duration (`SINGLE_DOSE_VOLUME / v
 
 - **Daily volume limit** (configurable, default 2000ml) - exceeding triggers ERROR state
 - **Available volume tracking** - tracks remaining water in source container
-- **System disable** - manual kill switch via web with 30-minute auto-re-enable
+- **System disable** - permanent kill switch via web; re-enabled only by clicking again
 - **24h auto-restart** - firmware restarts ESP32 after 24h uptime
 
 ### Reported Cycle Data
@@ -131,14 +131,15 @@ All `/api/*` endpoints require session authentication (cookie). Trusted VPS IP i
 |---|---|---|
 | GET | `/` | Dashboard (HTML, redirects to /login if no session) |
 | GET | `/api/status` | Full system status JSON (sensors, pump, algorithm state, RTC, WiFi, heap, uptime) |
+| GET | `/api/health` | Lightweight health check, no session required. Returns `{status, device_name, uptime}`. Used by VPS monitoring |
 
 ### Pump Control
 
 | Method | Endpoint | Description |
 |---|---|---|
-| POST | `/api/pump/normal` | Manual pump cycle (configured duration) |
-| POST | `/api/pump/extended` | Extended pump cycle (calibration duration) |
-| POST | `/api/pump/stop` | Emergency stop |
+| POST | `/api/pump/direct-on` | Turn pump on directly (bypasses algorithm, system-disable, daily limit). Optional `mode=monostable` POST param sets 120s safety timeout instead of configured duration |
+| POST | `/api/pump/direct-off` | Stop pump immediately (direct mode only) |
+| POST | `/api/pump/stop` | Emergency stop (any mode) |
 
 ### Configuration
 
@@ -146,7 +147,8 @@ All `/api/*` endpoints require session authentication (cookie). Trusted VPS IP i
 |---|---|---|
 | GET | `/api/pump-settings` | Get pump config (volume/s, cycle durations) |
 | POST | `/api/pump-settings` | Update volume per second (`volume_per_second` param, 0.1-20) |
-| GET/POST | `/api/system-toggle` | GET: system state. POST: toggle enable/disable (30min auto-enable) |
+| GET/POST | `/api/system-toggle` | GET: system state `{enabled}`. POST: toggle enable/disable (permanent until toggled again) |
+| POST | `/api/system-reset` | Reset algorithm to IDLE from any state. Stops pump safely if running, saves partial cycle to FRAM. Returns `{success, state, message}`. Blocked only during STATE_LOGGING |
 | GET | `/api/fill-water-max` | Get daily volume limit |
 | POST | `/api/set-fill-water-max` | Set daily volume limit (`value` param, 100-10000ml) |
 
@@ -221,7 +223,7 @@ Credentials are AES-256 encrypted before writing to FRAM. To reconfigure, repeat
 | RTC battery warning | Replace CR2032 in DS3231 module. Warning persists until physical replacement (OSF flag) |
 | Auth fails after FRAM wipe | Re-run provisioning to program credentials. Without FRAM credentials all logins are blocked |
 | Pump runs but sensors don't confirm | Check float sensor wiring, verify sensor orientation, inspect tube for blockage |
-| ERROR state (LED pulsing) | 1 pulse = daily limit exceeded (resets midnight UTC). 2 pulses = pump failure after 3 retries. Reset via button or web |
+| ERROR state (LED pulsing) | 1 pulse = daily limit exceeded (resets midnight UTC). 2 pulses = pump failure after 3 retries. Reset via GPIO button (short press) or "System Reset" button in web dashboard |
 
 ## Source Structure
 

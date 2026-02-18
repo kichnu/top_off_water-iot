@@ -26,10 +26,7 @@ const char* VPS_AUTH_TOKEN = "SETUP_REQUIRED_USE_CAPTIVE_PORTAL";
 const char* DEVICE_ID = "UNCONFIGURED_DEVICE";
 
 // ============== SYSTEM DISABLE/ENABLE ==============
-// New system-wide control (replaces pump toggle)
 bool systemDisabled = false;  // System starts ENABLED
-unsigned long systemDisabledTime = 0;
-const unsigned long SYSTEM_AUTO_ENABLE_MS = 30 * 60 * 1000; // 30 minutes
 
 // ============== LEGACY PUMP CONTROL (to be removed) ==============
 bool pumpGlobalEnabled = true;  // Default ON
@@ -70,44 +67,19 @@ void saveVolumeToNVS() {
 // ============== SYSTEM DISABLE/ENABLE FUNCTIONS ==============
 
 void setSystemState(bool enabled) {
+    systemDisabled = !enabled;
     if (enabled) {
-        // Re-enabling system
-        systemDisabled = false;
-        systemDisabledTime = 0;
         LOG_INFO("====================================");
         LOG_INFO("SYSTEM ENABLED");
         LOG_INFO("Algorithm will resume operation");
-        LOG_INFO("Sensors will be checked on next update");
         LOG_INFO("====================================");
         LOG_INFO("");
-
     } else {
-        // Disabling system
-        systemDisabled = true;
-        systemDisabledTime = millis();
         LOG_INFO("====================================");
         LOG_INFO("SYSTEM DISABLED");
-        LOG_INFO("Auto-enable in 30 minutes");
         LOG_INFO("Algorithm will pause at safe point");
         LOG_INFO("====================================");
         LOG_INFO("");
-    }
-}
-
-void checkSystemAutoEnable() {
-    if (systemDisabled && systemDisabledTime > 0) {
-        if (millis() - systemDisabledTime >= SYSTEM_AUTO_ENABLE_MS) {
-            LOG_INFO("====================================");
-            LOG_INFO("SYSTEM AUTO-ENABLE TRIGGERED");
-            LOG_INFO("30 minutes elapsed - re-enabling system");
-            
-            systemDisabled = false;
-            systemDisabledTime = 0;
-            
-            LOG_INFO("System state: ENABLED");
-            LOG_INFO("====================================");
-            LOG_INFO("");
-        }
     }
 }
 

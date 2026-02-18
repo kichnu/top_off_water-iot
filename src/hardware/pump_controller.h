@@ -9,4 +9,9 @@ bool isPumpActive();
 uint32_t getPumpRemainingTime();
 void stopPump();
 
+// Direct pump control — bypasses algorithm, system disable and daily limit
+bool directPumpOn(uint16_t durationSeconds);
+void directPumpOff();
+bool isDirectPumpMode();
+
 #endif

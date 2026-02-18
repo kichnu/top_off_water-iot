@@ -183,10 +183,6 @@ void loop() {
     updateWaterSensors();
     waterAlgorithm.update();
     
-    // ============== SYSTEM AUTO-ENABLE CHECK ==============
-    // Check if 30-minute timeout has elapsed for system re-enable
-    checkSystemAutoEnable();
-
     // Update other systems every 100ms
     if (now - lastUpdate >= 100) {
         updatePumpController();

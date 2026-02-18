@@ -355,42 +355,6 @@ const char* DASHBOARD_HTML = R"rawliteral(
             color: var(--text-primary);
         }
 
-        /* Notifications */
-        .notifications {
-            position: fixed;
-            top: 16px;
-            right: 16px;
-            z-index: 100;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .alert {
-            padding: 12px 16px;
-            border-radius: var(--radius-sm);
-            font-size: 0.875rem;
-            font-weight: 500;
-            animation: slideIn 0.3s ease;
-        }
-
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-
-        .alert.success {
-            background: rgba(34, 197, 94, 0.15);
-            border: 1px solid rgba(34, 197, 94, 0.3);
-            color: var(--accent-green);
-        }
-
-        .alert.error {
-            background: rgba(239, 68, 68, 0.15);
-            border: 1px solid rgba(239, 68, 68, 0.3);
-            color: var(--accent-red);
-        }
-
         /* Cards */
         .card {
             background: var(--bg-card);
@@ -595,7 +559,7 @@ const char* DASHBOARD_HTML = R"rawliteral(
         /* ===== SECOND CARD: Pump Control ===== */
         .pump-controls {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(3, 1fr);
             gap: 12px;
         }
 
@@ -884,93 +848,6 @@ const char* DASHBOARD_HTML = R"rawliteral(
         .ct-warn { color: var(--accent-yellow); }
         .ct-n { color: var(--text-primary); }
 
-        /* Modal System */
-        .modal-overlay {
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(4px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.2s ease;
-        }
-        .modal-overlay.show {
-            opacity: 1;
-            visibility: visible;
-        }
-        .modal-box {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            padding: 24px;
-            max-width: 360px;
-            width: 90%;
-            transform: scale(0.9);
-            transition: transform 0.2s ease;
-        }
-        .modal-overlay.show .modal-box {
-            transform: scale(1);
-        }
-        .modal-icon {
-            width: 48px;
-            height: 48px;
-            margin: 0 auto 16px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .modal-icon svg { width: 24px; height: 24px; }
-        .modal-icon.ok   { background: rgba(34, 197, 94, 0.15); }
-        .modal-icon.ok svg   { color: var(--accent-green); }
-        .modal-icon.err  { background: rgba(239, 68, 68, 0.15); }
-        .modal-icon.err svg  { color: var(--accent-red); }
-        .modal-icon.warn { background: rgba(234, 179, 8, 0.15); }
-        .modal-icon.warn svg { color: var(--accent-yellow); }
-        .modal-icon.info { background: rgba(56, 189, 248, 0.15); }
-        .modal-icon.info svg { color: var(--accent-blue); }
-        .modal-title {
-            font-size: 0.95rem;
-            font-weight: 700;
-            text-align: center;
-            margin-bottom: 8px;
-            color: var(--text-primary);
-        }
-        .modal-text {
-            font-size: 0.7rem;
-            text-align: center;
-            color: var(--text-secondary);
-            margin-bottom: 20px;
-            line-height: 1.5;
-        }
-        .modal-actions {
-            display: flex;
-            gap: 10px;
-        }
-        .modal-actions .btn {
-            flex: 1;
-            height: 40px;
-            padding: 0 16px;
-            border-radius: 6px;
-            font-size: 0.7rem;
-        }
-        .modal-actions .btn-primary {
-            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
-            border: none;
-            color: var(--bg-primary);
-        }
-        .modal-actions .btn-primary:hover:not(:disabled) {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(34, 211, 213, 0.3);
-        }
-        .modal-actions .btn-secondary:hover:not(:disabled) {
-            background: var(--bg-card-hover);
-            color: var(--text-primary);
-        }
     </style>
 </head>
 <body>
@@ -985,9 +862,6 @@ const char* DASHBOARD_HTML = R"rawliteral(
             </div>
             <button class="btn-back" onclick="logout()">Back</button>
         </header>
-
-        <!-- Notifications container -->
-        <div id="notifications" class="notifications"></div>
 
         <!-- FIRST CARD: System Status -->
         <div class="card">
@@ -1060,11 +934,14 @@ const char* DASHBOARD_HTML = R"rawliteral(
             </div>
 
             <div class="pump-controls">
-                <button id="manualCycleBtn" class="btn btn-off" onclick="toggleManualCycle()">
-                    Manual Cycle Off
+                <button id="manualPumpBtn" class="btn btn-off">
+                    Manual Pump OFF
                 </button>
                 <button id="systemToggleBtn" class="btn btn-primary" onclick="toggleSystem()">
                     System On
+                </button>
+                <button id="systemResetBtn" class="btn btn-secondary" onclick="systemReset()">
+                    System Reset
                 </button>
             </div>
         </div>
@@ -1196,66 +1073,7 @@ const char* DASHBOARD_HTML = R"rawliteral(
         </div>
     </div>
 
-    <!-- Modal -->
-    <div class="modal-overlay" id="alertModal">
-        <div class="modal-box">
-            <div class="modal-icon" id="alertIcon"></div>
-            <div class="modal-title" id="alertTitle"></div>
-            <div class="modal-text" id="alertText"></div>
-            <div class="modal-actions" id="alertActions"></div>
-        </div>
-    </div>
-
     <script>
-
-        // ============================================
-        // MODAL SYSTEM
-        // ============================================
-        const MODAL_ICONS = {
-            ok:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>',
-            err:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
-            warn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
-            info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
-        };
-
-        let alertCallback = null;
-
-        function showAlert(title, msg, type, cb) {
-            document.getElementById('alertIcon').className = 'modal-icon ' + type;
-            document.getElementById('alertIcon').innerHTML = MODAL_ICONS[type] || MODAL_ICONS.info;
-            document.getElementById('alertTitle').textContent = title;
-            document.getElementById('alertText').textContent = msg;
-            document.getElementById('alertActions').innerHTML =
-                '<button class="btn btn-primary" onclick="closeAlert()">OK</button>';
-            alertCallback = cb || null;
-            document.getElementById('alertModal').classList.add('show');
-        }
-
-        function showConfirm(title, msg, type, onConfirm) {
-            document.getElementById('alertIcon').className = 'modal-icon ' + type;
-            document.getElementById('alertIcon').innerHTML = MODAL_ICONS[type] || MODAL_ICONS.info;
-            document.getElementById('alertTitle').textContent = title;
-            document.getElementById('alertText').textContent = msg;
-            document.getElementById('alertActions').innerHTML =
-                '<button class="btn btn-secondary" onclick="closeAlert()">Cancel</button>' +
-                '<button class="btn btn-primary" onclick="closeAlert(true)">Confirm</button>';
-            alertCallback = onConfirm;
-            document.getElementById('alertModal').classList.add('show');
-        }
-
-        function closeAlert(confirmed) {
-            document.getElementById('alertModal').classList.remove('show');
-            if (confirmed && alertCallback) alertCallback();
-            alertCallback = null;
-        }
-
-        document.addEventListener('click', function(e) {
-            if (e.target.id === 'alertModal') closeAlert();
-        });
-
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') closeAlert();
-        });
 
         // ============================================
         // SESSION EXPIRY HANDLING (for VPS proxy)
@@ -1271,9 +1089,9 @@ const char* DASHBOARD_HTML = R"rawliteral(
             // Stop all polling intervals
             pollingIntervals.forEach(id => clearInterval(id));
             pollingIntervals = [];
-            if (pumpCheckInterval) {
-                clearInterval(pumpCheckInterval);
-                pumpCheckInterval = null;
+            if (monostableTimer) {
+                clearTimeout(monostableTimer);
+                monostableTimer = null;
             }
 
             // Show overlay
@@ -1329,28 +1147,13 @@ const char* DASHBOARD_HTML = R"rawliteral(
         // STATE TRACKING
         // ============================================
         let systemEnabled = true;
-        let manualCycleActive = false;
-        let pumpCheckInterval = null;
         let maxDailyVolume = 2000;
 
-        // ============================================
-        // NOTIFICATION HELPER
-        // ============================================
-        function showNotification(message, type) {
-            const notifications = document.getElementById("notifications");
-            const alert = document.createElement("div");
-            alert.className = "alert " + type;
-            alert.textContent = message;
-            notifications.appendChild(alert);
-
-            setTimeout(() => {
-                if (notifications.contains(alert)) {
-                    alert.style.opacity = '0';
-                    alert.style.transform = 'translateX(100%)';
-                    setTimeout(() => notifications.removeChild(alert), 300);
-                }
-            }, 4000);
-        }
+        // Direct pump button state
+        var pumpBtnDownTime = 0;
+        var pumpBtnIsDown = false;
+        var monostableTimer = null;
+        var monostableActive = false;
 
         // ============================================
         // SYSTEM TOGGLE (bistable ON/OFF)
@@ -1364,21 +1167,18 @@ const char* DASHBOARD_HTML = R"rawliteral(
                 .then((data) => {
                     if (data.success) {
                         systemEnabled = data.enabled;
-                        updateSystemToggleButton(data.enabled, data.remaining_seconds);
-                        showNotification(data.message, "success");
-                    } else {
-                        showNotification("Failed to toggle system", "error");
+                        updateSystemToggleButton(data.enabled);
                     }
                 })
                 .catch((error) => {
-                    showNotification("Network error", "error");
+                    console.error("Toggle system error:", error);
                 })
                 .finally(() => {
                     btn.disabled = false;
                 });
         }
 
-        function updateSystemToggleButton(enabled, remainingSeconds) {
+        function updateSystemToggleButton(enabled) {
             const btn = document.getElementById("systemToggleBtn");
             if (!btn) return;
 
@@ -1386,13 +1186,7 @@ const char* DASHBOARD_HTML = R"rawliteral(
                 btn.textContent = "System On";
                 btn.className = "btn btn-primary";
             } else {
-                if (remainingSeconds && remainingSeconds > 0) {
-                    const minutes = Math.floor(remainingSeconds / 60);
-                    const seconds = remainingSeconds % 60;
-                    btn.textContent = "System Off (" + minutes + ":" + seconds.toString().padStart(2, "0") + ")";
-                } else {
-                    btn.textContent = "System Off";
-                }
+                btn.textContent = "System Off";
                 btn.className = "btn btn-off";
             }
         }
@@ -1407,123 +1201,129 @@ const char* DASHBOARD_HTML = R"rawliteral(
                     if (!data) return;
                     if (data.success) {
                         systemEnabled = data.enabled;
-                        updateSystemToggleButton(data.enabled, data.remaining_seconds);
+                        updateSystemToggleButton(data.enabled);
                     }
                 })
                 .catch((error) => console.error("Failed to load system state:", error));
         }
 
         // ============================================
-        // MANUAL CYCLE TOGGLE (bistable with auto-reset)
+        // SYSTEM RESET (monostable)
         // ============================================
-        function toggleManualCycle() {
-            const btn = document.getElementById("manualCycleBtn");
-            
-            if (manualCycleActive) {
-                btn.disabled = true;
-                btn.textContent = "Stopping...";
+        function systemReset() {
+            var btn = document.getElementById("systemResetBtn");
+            btn.disabled = true;
+            btn.textContent = "Resetting...";
+            fetch("api/system-reset", { method: "POST" })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!data.success) console.error("System reset failed:", data.message);
+                })
+                .catch(function(e) { console.error("System reset error:", e); })
+                .finally(function() {
+                    btn.disabled = false;
+                    btn.textContent = "System Reset";
+                });
+        }
 
-                fetch("api/pump/stop", { method: "POST" })
-                    .then((response) => response.json())
-                    .then((data) => {
-                        if (data.success) {
-                            manualCycleActive = false;
-                            updateManualCycleButton(false);
-                            showNotification("Manual cycle stopped", "success");
-                            stopPumpMonitoring();
-                        } else {
-                            showNotification("Failed to stop pump", "error");
-                        }
-                    })
-                    .catch(() => showNotification("Connection error", "error"))
-                    .finally(() => {
-                        btn.disabled = false;
-                    });
-            } else {
-                btn.disabled = true;
-                btn.textContent = "Starting...";
+        // ============================================
+        // MANUAL PUMP (bistable + monostable)
+        // ============================================
+        (function initPumpBtn() {
+            var btn = document.getElementById("manualPumpBtn");
+            if (!btn) return;
+            btn.addEventListener("mousedown", onPumpBtnDown);
+            btn.addEventListener("mouseup", onPumpBtnUp);
+            btn.addEventListener("mouseleave", onPumpBtnUp);
+            btn.addEventListener("touchstart", function(e) { e.preventDefault(); onPumpBtnDown(); });
+            btn.addEventListener("touchend", function(e) { e.preventDefault(); onPumpBtnUp(); });
+        })();
 
-                fetch("api/pump/normal", { method: "POST" })
-                    .then((response) => response.json())
-                    .then((data) => {
-                        if (data.success) {
-                            manualCycleActive = true;
-                            updateManualCycleButton(true);
-                            showNotification("Manual cycle started for " + data.duration + "s", "success");
-                            startPumpMonitoring();
-                        } else {
-                            showNotification("Failed to start pump", "error");
-                        }
-                    })
-                    .catch(() => showNotification("Connection error", "error"))
-                    .finally(() => {
-                        btn.disabled = false;
-                    });
+        function onPumpBtnDown() {
+            pumpBtnIsDown = true;
+            pumpBtnDownTime = Date.now();
+            monostableTimer = setTimeout(function() {
+                monostableActive = true;
+                fetch("api/pump/direct-on", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+                    body: "mode=monostable"
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.success) {
+                        updatePumpButton(true);
+                    } else {
+                        monostableActive = false;
+                        console.error("Failed to start pump (monostable)");
+                    }
+                })
+                .catch(function(e) { monostableActive = false; console.error("Pump error:", e); });
+            }, 3000);
+        }
+
+        function onPumpBtnUp() {
+            if (!pumpBtnIsDown) return;
+            pumpBtnIsDown = false;
+            var holdDuration = Date.now() - pumpBtnDownTime;
+            if (monostableTimer) {
+                clearTimeout(monostableTimer);
+                monostableTimer = null;
+            }
+            if (monostableActive) {
+                monostableActive = false;
+                fetch("api/pump/direct-off", { method: "POST" })
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) { if (data.success) updatePumpButton(false); })
+                    .catch(function(e) { console.error("Pump stop error:", e); });
+            } else if (holdDuration < 3000) {
+                var pumpIsOn = document.getElementById("manualPumpBtn").classList.contains("btn-primary");
+                if (pumpIsOn) {
+                    fetch("api/pump/direct-off", { method: "POST" })
+                        .then(function(r) { return r.json(); })
+                        .then(function(data) { if (data.success) updatePumpButton(false); })
+                        .catch(function(e) { console.error("Pump stop error:", e); });
+                } else {
+                    fetch("api/pump/direct-on", { method: "POST" })
+                        .then(function(r) { return r.json(); })
+                        .then(function(data) {
+                            if (data.success) updatePumpButton(true);
+                            else console.error("Failed to start pump");
+                        })
+                        .catch(function(e) { console.error("Pump start error:", e); });
+                }
             }
         }
 
-        function updateManualCycleButton(isActive) {
-            const btn = document.getElementById("manualCycleBtn");
+        function updatePumpButton(isOn) {
+            var btn = document.getElementById("manualPumpBtn");
             if (!btn) return;
-
-            if (isActive) {
-                btn.textContent = "Manual Cycle On";
+            if (isOn) {
+                btn.textContent = "Manual Pump ON";
                 btn.className = "btn btn-primary";
             } else {
-                btn.textContent = "Manual Cycle Off";
+                btn.textContent = "Manual Pump OFF";
                 btn.className = "btn btn-off";
             }
         }
 
-        function startPumpMonitoring() {
-            if (pumpCheckInterval) clearInterval(pumpCheckInterval);
-            
-            pumpCheckInterval = setInterval(() => {
-                secureFetch("api/status")
-                    .then((response) => {
-                        if (!response) return null;
-                        return response.json();
-                    })
-                    .then((data) => {
-                        if (!data) return;
-                        if (!data.pump_active && manualCycleActive) {
-                            manualCycleActive = false;
-                            updateManualCycleButton(false);
-                            stopPumpMonitoring();
-                        }
-                    })
-                    .catch(() => {});
-            }, 1000);
-        }
-
-        function stopPumpMonitoring() {
-            if (pumpCheckInterval) {
-                clearInterval(pumpCheckInterval);
-                pumpCheckInterval = null;
-            }
-        }
-
         // ============================================
-        // EXTENDED PUMP (Calibration)
+        // EXTENDED PUMP (Calibration) — uses direct pump
         // ============================================
         function triggerExtendedPump() {
             const btn = document.getElementById("extendedBtn");
             btn.disabled = true;
             btn.textContent = "Starting...";
 
-            fetch("api/pump/extended", { method: "POST" })
+            fetch("api/pump/direct-on", { method: "POST" })
                 .then((response) => response.json())
                 .then((data) => {
-                    if (data.success) {
-                        showNotification("Calibration pump started for " + data.duration + "s", "success");
-                    } else {
-                        showNotification("Failed to start pump", "error");
-                    }
+                    if (!data.success) console.error("Failed to start calibration pump");
                 })
-                .catch(() => showNotification("Connection error", "error"))
+                .catch((e) => console.error("Calibration pump error:", e))
                 .finally(() => {
                     btn.disabled = false;
-                    btn.textContent = "Pump Calibration (30s)";
+                    btn.textContent = "Start Calibration";
                 });
         }
 
@@ -1554,26 +1354,23 @@ const char* DASHBOARD_HTML = R"rawliteral(
                 return;
             }
 
-            showConfirm("Change Setting?", "Change Volume per Second to " + volumeValue.toFixed(1) + " ml/s?", "info", function() {
-                statusSpan.textContent = "Updating...";
+            statusSpan.textContent = "Updating...";
 
-                const formData = new FormData();
-                formData.append("volume_per_second", volumeValue);
+            const formData = new FormData();
+            formData.append("volume_per_second", volumeValue);
 
-                fetch("api/pump-settings", { method: "POST", body: formData })
-                    .then((response) => response.json())
-                    .then((data) => {
-                        if (data.success) {
-                            statusSpan.textContent = "Current: " + volumeValue.toFixed(1) + " ml/s";
-                            showNotification("Volume updated to " + volumeValue.toFixed(1) + " ml/s", "success");
-                        } else {
-                            statusSpan.textContent = "Error: " + (data.error || "Update failed");
-                        }
-                    })
-                    .catch((error) => {
-                        statusSpan.textContent = "Network error";
-                    });
-            });
+            fetch("api/pump-settings", { method: "POST", body: formData })
+                .then((response) => response.json())
+                .then((data) => {
+                    if (data.success) {
+                        statusSpan.textContent = "Current: " + volumeValue.toFixed(1) + " ml/s";
+                    } else {
+                        statusSpan.textContent = "Error: " + (data.error || "Update failed");
+                    }
+                })
+                .catch((error) => {
+                    statusSpan.textContent = "Network error";
+                });
         }
 
         // ============================================
@@ -1679,14 +1476,11 @@ const char* DASHBOARD_HTML = R"rawliteral(
                     // System toggle sync
                     if (typeof data.system_disabled !== 'undefined') {
                         systemEnabled = !data.system_disabled;
-                        updateSystemToggleButton(!data.system_disabled, data.system_remaining_seconds);
+                        updateSystemToggleButton(!data.system_disabled);
                     }
 
-                    // Manual cycle sync
-                    if (!data.pump_active && manualCycleActive) {
-                        manualCycleActive = false;
-                        updateManualCycleButton(false);
-                    }
+                    // Sync manual pump button with actual pump state
+                    updatePumpButton(data.pump_active);
 
                     // WiFi status
                     const wifiItem = document.getElementById("wifiItem");
@@ -1717,11 +1511,7 @@ const char* DASHBOARD_HTML = R"rawliteral(
                     document.getElementById("freeHeap").textContent = (data.free_heap / 1024).toFixed(1) + " KB";
                     document.getElementById("uptime").textContent = formatUptime(data.uptime);
 
-                    // Disable buttons when needed
-                    const manualBtn = document.getElementById("manualCycleBtn");
-                    if (manualBtn) {
-                        manualBtn.disabled = data.system_disabled;
-                    }
+                    // Note: manualPumpBtn is NOT disabled when system_disabled — direct pump bypasses system state
 
                     const extendedBtn = document.getElementById("extendedBtn");
                     if (extendedBtn) {
@@ -1760,27 +1550,24 @@ const char* DASHBOARD_HTML = R"rawliteral(
         }
 
         function resetDailyVolume() {
-            showConfirm("Reset Volume?", "Reset daily volume to 0ml?", "warn", function() {
-                const btn = document.getElementById("resetDailyVolumeBtn");
-                btn.disabled = true;
-                btn.textContent = "Resetting...";
+            const btn = document.getElementById("resetDailyVolumeBtn");
+            btn.disabled = true;
+            btn.textContent = "Resetting...";
 
-                fetch("api/reset-daily-volume", { method: "POST" })
-                    .then((response) => response.json())
-                    .then((data) => {
-                        if (data.success) {
-                            showNotification("Daily volume reset", "success");
-                            loadDailyVolume();
-                        } else {
-                            showNotification("Failed: " + (data.error || "Unknown error"), "error");
-                        }
-                    })
-                    .catch(() => showNotification("Network error", "error"))
-                    .finally(() => {
-                        btn.disabled = false;
-                        btn.textContent = "Reset Daily Volume";
-                    });
-            });
+            fetch("api/reset-daily-volume", { method: "POST" })
+                .then((response) => response.json())
+                .then((data) => {
+                    if (data.success) {
+                        loadDailyVolume();
+                    } else {
+                        console.error("Daily volume reset failed:", data.error);
+                    }
+                })
+                .catch((e) => console.error("Daily volume reset error:", e))
+                .finally(() => {
+                    btn.disabled = false;
+                    btn.textContent = "Reset Daily Volume";
+                });
         }
 
 
@@ -1826,10 +1613,9 @@ const char* DASHBOARD_HTML = R"rawliteral(
             const value = parseInt(input.value);
             
             if (isNaN(value) || value < 100 || value > 10000) {
-                showNotification("Value must be 100-10000 ml", "error");
                 return;
             }
-            
+
             fetch("api/set-available-volume", {
                 method: "POST",
                 headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -1838,30 +1624,26 @@ const char* DASHBOARD_HTML = R"rawliteral(
                 .then((response) => response.json())
                 .then((data) => {
                     if (data.success) {
-                        showNotification("Available volume set to " + value + " ml", "success");
                         input.value = "";
                         loadAvailableVolume();
                     } else {
-                        showNotification("Failed: " + (data.error || "Unknown error"), "error");
+                        console.error("Set available volume failed:", data.error);
                     }
                 })
-                .catch(() => showNotification("Network error", "error"));
+                .catch((e) => console.error("Set available volume error:", e));
         }
 
         function refillAvailableVolume() {
-            showConfirm("Refill Volume?", "Refill available volume to max?", "info", function() {
-                fetch("api/refill-available-volume", { method: "POST" })
-                    .then((response) => response.json())
-                    .then((data) => {
-                        if (data.success) {
-                            showNotification("Available volume refilled", "success");
-                            loadAvailableVolume();
-                        } else {
-                            showNotification("Failed: " + (data.error || "Unknown error"), "error");
-                        }
-                    })
-                    .catch(() => showNotification("Network error", "error"));
-            });
+            fetch("api/refill-available-volume", { method: "POST" })
+                .then((response) => response.json())
+                .then((data) => {
+                    if (data.success) {
+                        loadAvailableVolume();
+                    } else {
+                        console.error("Refill available volume failed:", data.error);
+                    }
+                })
+                .catch((e) => console.error("Refill available volume error:", e));
         }
 
         // ============================================
@@ -1870,12 +1652,11 @@ const char* DASHBOARD_HTML = R"rawliteral(
         function setDailyLimit() {
             const input = document.getElementById("dailyLimitInput");
             const value = parseInt(input.value);
-            
+
             if (isNaN(value) || value < 100 || value > 10000) {
-                showNotification("Value must be 100-10000 ml", "error");
                 return;
             }
-            
+
             fetch("api/set-fill-water-max", {
                 method: "POST",
                 headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -1884,14 +1665,13 @@ const char* DASHBOARD_HTML = R"rawliteral(
                 .then((response) => response.json())
                 .then((data) => {
                     if (data.success) {
-                        showNotification("Daily limit set to " + value + " ml", "success");
                         input.value = "";
                         loadDailyVolume();
                     } else {
-                        showNotification("Failed: " + (data.error || "Unknown error"), "error");
+                        console.error("Set daily limit failed:", data.error);
                     }
                 })
-                .catch(() => showNotification("Network error", "error"));
+                .catch((e) => console.error("Set daily limit error:", e));
         }
 
         // ============================================
@@ -1920,7 +1700,7 @@ const char* DASHBOARD_HTML = R"rawliteral(
                 .then(function(data) {
                     if (!data) return;
                     if (!data.success) {
-                        showNotification(data.error || "Failed to load cycles", "error");
+                        console.error("Failed to load cycles:", data.error);
                         return;
                     }
                     var tb = document.getElementById("cycleTableBody");
@@ -1954,9 +1734,8 @@ const char* DASHBOARD_HTML = R"rawliteral(
                             '<td class="' + ac + '">' + al + '</td>';
                         tb.appendChild(tr);
                     });
-                    showNotification("Loaded " + data.total + " cycles", "success");
                 })
-                .catch(function() { showNotification("Network error", "error"); })
+                .catch(function(e) { console.error("Load cycles error:", e); })
                 .finally(function() {
                     btn.disabled = false;
                     btn.textContent = "Load History";

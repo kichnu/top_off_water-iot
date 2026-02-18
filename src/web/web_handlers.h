@@ -17,9 +17,11 @@ void handleLogout(AsyncWebServerRequest *request);
 
 // API handlers
 void handleStatus(AsyncWebServerRequest *request);
-void handlePumpNormal(AsyncWebServerRequest *request);
-void handlePumpExtended(AsyncWebServerRequest *request);
 void handlePumpStop(AsyncWebServerRequest *request);
+
+// Direct pump control (bypasses algorithm, system disable and daily limit)
+void handleDirectPumpOn(AsyncWebServerRequest *request);
+void handleDirectPumpOff(AsyncWebServerRequest *request);
 void handlePumpSettings(AsyncWebServerRequest *request);
 
 // ============== SYSTEM TOGGLE ==============
@@ -47,6 +49,9 @@ void handleSetFillWaterMax(AsyncWebServerRequest* request);
 
 // Cycle History endpoint
 void handleGetCycleHistory(AsyncWebServerRequest* request);
+
+// System reset (works from any state except LOGGING)
+void handleSystemReset(AsyncWebServerRequest *request);
 
 // Health check endpoint (no session required)
 void handleHealth(AsyncWebServerRequest *request);
